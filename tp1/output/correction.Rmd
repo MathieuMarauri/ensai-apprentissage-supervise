@@ -84,8 +84,8 @@ __Cas 3__
 
 On travaille sur des données réelles issues d'une enquête, à partir d'un échantillon tiré au hasard de $n=1000$ consommateurs de café. La variable à expliquer $Y$ est qualitative binaire et prend les modalités "sucré" et "non sucré". La variable explicative à notre disposition est $X$ qui représente le sexe. On dispose de la table avec en lignes les 1000 consommateurs et en colonnes les 2 variables $X$ et $Y$. Des résultats de statistique bivariée nous donnent :
 
-* Parmi les femmes, on a 20% qui prennent du sucre dans leur café $Y="sucré"$
-* Parmi les hommes, on a 10% qui prennent du sucre dans leur café $Y="sucré"$
+* Parmi les femmes, 20% prennent du sucre dans leur café
+* Parmi les hommes, 10% prennent du sucre dans leur café
 
 ## Question 1 - Règle de Bayes
 
@@ -127,7 +127,7 @@ $$
 \mathcal{R}_P^* & = P(Y \neq f^*(X)) \\
 & = P(Y = 1 \cap f^*(X) = 0) + P(Y = 0 \cap f^*(X) = 1) \\
 & = P(Y = 1 \cap X \leq 0) + P(Y = 0 \cap X > 0) \\
-& = P(X \leq 0) \times P(Y = 1 | X \leq 0) + P(X > 0) \times P(Y = 0 | X > 0) \\
+& = P(X \leq 0) \times P(Y = 1 | X \leq 0) + P(X > 0) \times P(Y = 0 | X > 0) \text{, avec }P(A \cap B) = P(A | B) \times P(B)\\
 & = 0,5 \times 0,1 + 0,5 \times 0,2 \\
 & = 0,15
 \end{split}
@@ -171,7 +171,7 @@ Comme la loi jointe de $(X, Y)$ n'est pas connue il est impossible de connaître
 
 >_Est-il possible de donner un indicateur de la complexité de ces problèmes et ainsi de les ordonner en fonction de leur complexité ?_
 
-Le risque de Bayes donne une idée de la complexité du problème. Plus l'erreur théorique minimale est importante plus on considère le problème comme complexe. Ainsi le cas 2 est plus complexe que le premier. 
+Le risque de Bayes donne une idée de la complexité du problème. Plus l'erreur théorique minimale est importante plus on considère le problème comme complexe. Ainsi le cas 2 est plus complexe que le premier, théoriquement. 
 
 ## Question 3 - Simulation
 
@@ -196,14 +196,15 @@ Y1 <- rep(0, n_train)
 Y1[X <= 0 & U <= 0.2] <- 1
 Y1[X > 0 & U > 0.4] <- 1
 
-# Y est transformé en factor pour faciliter l'utilisation de la fonction tune.knn dans la suite
+# Y est transformé en "factor" pour faciliter l'utilisation de la fonction tune.knn dans la suite
 Y <- as.factor(Y1)
 
 # Créer un data.frame avec X et Y
 data <- data.frame(X, Y)
 ```
 
-Sur le graphe suivant on peut voir la densité de $X$ selon la valeur prise par $Y$.
+Le graphe suivant montre la densité de $X$ selon la valeur prise par $Y$. On y voit une différence entre les valeurs positives et négatives de $X$.
+
 
 ```{r simul_plot}
 ggplot(
@@ -258,7 +259,7 @@ ggplot(
 Le modèle des $K$ plus-proches-voisins (_K-nearest-neighbours_ en anglais) est un modèle d'apprentissage supervisé utilisable en classification et en régression. Son principe est simple. Pour prédire la classe d'une nouvelle observation, on calcule la distance qui sépare ce nouveau point de tous les points des données d'apprentissage, on sélectionne les $k$ points les plus proches puis on détermine la classe à prédire en faisant un vote à la majorité. 
 
 <div style="text-align:center">
-![Modèle KNN expliqué visuellement. [source](https://www.datacamp.com/tutorial/k-nearest-neighbor-classification-scikit-learn)](images/knn.png)
+![Modèle des plus proches voisins expliqué visuellement.](images/knn_explique.png){width=70%}
 </div>
 
 _Quelques points d'attention :_
@@ -268,12 +269,12 @@ _Quelques points d'attention :_
 * Enfin il faut savoir que plus il y a de prédicteurs plus les plus proches voisins seront potentiellement éloignés, c'est ce que l'on appelle le fléau de la dimension. [Ce papier](https://www.researchgate.net/publication/30013021_On_the_Surprising_Behavior_of_Distance_Metric_in_High-Dimensional_Space) fournit des détails intéressants à ce sujet.
 
 <div style="text-align:center">
-![Le fléau de la dimension. [Source](https://medium.com/@soumiksanku08/curse-of-dimensionality-293d0d16fe2a)](images/curse.png)
+![Le fléau de la dimension. Plus le nombre de dimension, plus le nombre de points dans la sphére unité va diminuer.](images/curse-dimensionality.png){width=70%}
 </div>
 
 #### La règle de décision
 
-Dans le cas d'une classification, la règle de décision associée aux $k$ plus-proches-voisins est le vote à la majorité. Pour $k=5$ par exemple, si 3 voisins ont $Y=0$ et 2 voisins ont $Y=1$ alors la prédiction sera $\widehat{Y}=0$.
+Dans le cas d'une classification, la règle de décision associée aux $k$ plus-proches-voisins est le vote à la majorité. Exemple : pour $k=5$, si 3 voisins ont une valeur $Y$ de $A$ et 2 voisins ont une valeur $Y$ de $B$ alors la prédiction sera $\widehat{Y}=A$.
 
 #### Un premier modèle
 
@@ -304,7 +305,7 @@ sum(knn_pred == test$Y) / n_test
 1 - sum(knn_pred == test$Y) / n_test
 ```
 
-L'erreur est de `r 1 - sum(knn_pred == test$Y) / n_test`. 
+L'erreur est de `r 1 - sum(knn_pred == test$Y) / n_test`. Cela veut dire que le modèle se trompe dans `r round(1 - sum(knn_pred == test$Y) / n_test * 100, digits = 1)`% des cas. 
 
 #### Le choix de $k$
 
