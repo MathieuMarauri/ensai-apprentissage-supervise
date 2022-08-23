@@ -15,7 +15,7 @@ library("knitr")
 opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, cache = TRUE, fig.align = 'center', dpi = 300, out.width = '75%')
 ```
 
-Les différentes librairies qui seront utilisés pour ce TP sont listées ici. Le code pour générer ce document ainsi que le code R qui a servi de base peuvent être trouvés [ici](https://github.com/MathieuMarauri/apprentissage-2020/blob/master/tp1/output/correction.Rmd) et [là](https://github.com/MathieuMarauri/apprentissage-2020/blob/master/tp1/src/TP1.R).
+Les différentes librairies qui seront utilisés pour ce TP sont listées ici. Le code pour générer ce document ainsi que le code R qui a servi de base peuvent être trouvés [ici](https://github.com/MathieuMarauri/ensai-apprentissage-supervise/blob/master/tp1/output/correction.Rmd) et [là](https://github.com/MathieuMarauri/ensai-apprentissage-supervise/blob/master/tp1/src/TP1.R).
 
 ```{r librairies}
 library("caret") # ensemble de meta-fonctions nécessaires au processus d'apprentissage supervisé
