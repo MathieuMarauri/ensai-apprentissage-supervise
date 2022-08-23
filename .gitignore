@@ -1,0 +1,14 @@
+# R files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# test file
+*test.R
+
+# mac DS_store files
+*.DS_store
+
+# Cache folder
+*correction_*

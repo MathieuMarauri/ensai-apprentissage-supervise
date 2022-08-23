@@ -1,0 +1,445 @@
+---
+title: "Apprentissage supervisé - TP2"
+output:
+  html_document:
+    code_folding: none
+    toc: true
+    toc_depth: 2
+    theme: cerulean
+    highlight: tango
+    css: style.css
+---
+
+```{r initial_chunk, echo = FALSE, warning = FALSE, message = FALSE}
+library("knitr")
+opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, cache = TRUE, fig.align = 'center', dpi = 300, out.width = '75%')
+```
+
+# Introduction
+
+Les différentes librairies qui seront utilisés pour ce TP sont listées ici. Le code pour générer ce document ainsi que le code R qui a servi de base peuvent être trouvés [ici](https://github.com/MathieuMarauri/apprentissage-2020/blob/master/tp2/output/correction.Rmd) et [là](https://github.com/MathieuMarauri/apprentissage-2020/blob/master/tp2/src/TP1.R).
+
+```{r librairies}
+library('CHAID') # modèle CHAID, installer avec install.packages("CHAID", repos="http://R-Forge.R-project.org")
+library("rpart") # modèle CART
+library("rpart.plot") # plot modèle CART 
+```
+
+```{r ggplot-theme, echo = FALSE}
+library("kableExtra") # table formating
+library("magrittr") # Pipe operators
+```
+
+#### Énoncé
+
+On dispose d'un ensemble de données sur les champignons (source The Audubon Society Field Guide to North American Mushrooms (1981). G. H. Linco (Pres.), New York : Alfred A. Knopf). Il est constitué de 8124 observations pour lesquelles diverses descriptions sont disponibles comme la
+surface, l'odeur, la couleur, etc, ainsi que l'information : comestible ou poison.
+
+L'objectif de ce TD/TP est de construire un modèle prédictif capable de différencier les champignons comestibles des non-comestibles, grâce aux méthodes de segmentation par arbres.
+
+Variable cible :
+Classe : comestible=e, poison=p
+
+Variables explicatives :
+
+* odor = odeur : amande (almond) = a, anis (anise) = l, creosote (creosote) = c, poisson (fishy) = y, repugnant (foul) = f, moisi (musty) = m, aucune (none) = n, âcre (pungent) = p, épicé (spicy) = s
+* stalk-shape : forme du pied s'élargissant (enlarging) = e, se resserrant (tapering) = t 
+* stalk-root : racine bulbeux (bulbous) = b, en forme de massue (club)=c, en forme de corolle
+(cup)=u, égales ou par paires (equal) = e, avec des rhizomes (rhizomorphs) =z, racines (rooted) = r
+* stalk-color-above-ring : couleur de tige au-dessus de l'anneau marron (brown)=n, chamois
+(buff)=b, cannelle (cinnamon) =c, gris (gray)=g, orange=o, rose (pink) = p, rouge (red) = e, blanc (white) = w, jaune (yellow) =y
+* stalk-color-below-ring : couleur de tige au-dessous de l'anneau marron (brown)=n, chamois
+(buff)=b, cannelle (cinnamon) =c, gris (gray)=g, orange=o, rose (pink) = p, rouge (red) = e, blanc (white) = w, jaune (yellow) =y
+* spore-print-color : couleur des spores noire (black) = k, marron (brown) = n, chamois (buff) = b, chocolat (chocolate) = h, verte (green) = r, orange=o, violette (purple) =u, blanche (white) = w, jaune (yellow) = y
+
+
+# Partie 1 - TD
+
+## Question 1 - La méthode CART
+
+>_On désire appliquer la méthode CART (discrimination par arbre) pour détecter les champignons non comestibles. Quels sont les grands principes de cette méthode ?_
+
+Slide 29 = principe général
+Slides 64 à 81 = élagage
+
+## Question 2 - Autres méthodes envisageables
+
+> _Quelles sont les autres méthodes envisageables ?_
+
+De nombreuses méthodes permettent de réaliser uns discrimination binaire : un modèle KNN, un modèle bayésien naïf (_naive bayes_) ou encore des SVM, un arbre CHAID, un arbre à inférence conditionnelle (_conditional inference tree_, package `ctree`), une analyse discriminante linéaire (_linear discriminant analysis_), des méthodes de régression (logistique, pénalisée, ...), des méthodes d'ensembles (_bagging_, _boosting_, stacking), des réseaux de neurones ...
+
+Une liste non exhaustive peut être consultée [ici](https://mlr.mlr-org.com/articles/tutorial/integrated_learners.html#classification-84-)
+
+
+## Question 3 - Apprentissage, validation, test
+
+<blockquote>
+_L'échantillon total constitué de 8124 observations pourrait être divisé en trois parties :
+
+* Echantillon d'apprentissage,
+* Echantillon de validation,
+* Echantillon test.
+
+Quel serait le rôle de chacun de ces trois échantillons dans la mise en œuvre de CART?_
+</blockquote>
+
+## Question 4 - La validation croisée
+
+>_Pourrait-on se passer de créer ces trois sous-échantillons ? Si oui, quelle modification de la méthode en découlerait ?_
+
+## Question 5 - Critères de division
+
+>_Quel critère de division d'un noeud utilise-t-on pour construire l'arbre maximal ? Quelles sont les fonctions d'impureté les plus souvent utilisées ?_
+
+Slides 31 à 35
+
+## Question 6 - Probabilité a posteriori
+
+>_La variable à expliquer Y étant binaire, elle définit une partition de la population en deux groupes r avec r=1 ou r=2. Rappeler l’expression de la probabilité a posteriori d’appartenance au groupe Gr pour les éléments d’un noeud t. Comment l’estime-t-on ?_
+
+On cherche $P(G_r | t)$. D'après la formule de Bayes on a :
+
+$$
+P(G_r | t) = \frac{P(G_r) \times P(t | G_r)}{P(t)}
+$$
+On doit donc estimer 3 éléments pour avoir $P(G_r | t)$. $P(G_r)$ est estimé par la fréquence empirique soit $P(G_r) = \frac{n_r}{n}$. 
+
+De même $P(t | G_r)$ est estimé par proportion des observations du groupe $G_r$ qui sont dans le nœud $t$ soit $P(t | G_r) = \frac{n_r(t)}{n_r}$.
+
+Enfin on a $P(t) = \sum_{s}P(G_s) \times P(t | G_s)$ donc :
+
+$$
+P(t) = \sum_{s}\frac{n_s}{n} \times \frac{n_s(t)}{n_s} = \sum_{s}\frac{n_s(t)}{n} = \frac{n(t)}{n}
+$$
+
+Au final on a donc : 
+
+$$
+\begin{split}
+P(G_r | t) & = \frac{\frac{n_r}{n} \times \frac{n_r(t)}{n_r}}{\frac{n(t)}{n}} \\
+ & = \frac{\frac{n_r(t)}{n}}{\frac{n(t)}{n}} \\
+ & = \frac{n_r(t)}{n(t)}
+\end{split}
+$$
+
+Il s'agit donc simplement de la proportion d'individus de la classe $r$ dans le nœud.
+
+## Question 7 - Impureté initiale
+
+>_Les probabilités a priori sont supposées proportionnelles aux effectifs dans l’échantillon. L’indice de diversité de GINI a été retenu comme fonction d’impureté. Quelle serait l’impureté initiale (segment racine t0), si par exemple parmi les 4882 champignons de l’échantillon d’apprentissage, 2531 étaient comestibles et 2351 étaient poisons?_
+
+Pour un nœud $t$ avec $K$ groupes, l'indice de Gini est calculé avec l'expression suivante : 
+
+$$
+I(t) = 1 - \sum_{r = 1}^{K}P^2(G_r | t)
+$$
+Comme dans la question précédente on sait que $P(G_r | t) = \frac{n_r(t)}{n(t)}$ donc pour le nœud racine on a :
+
+$$
+\begin{split}
+I(t) & = 1 - \left[\left(\frac{n_1(t)}{n(t)}\right)^2  + \left(\frac{n_2(t)}{n(t)}\right)^2 \right] \\
+ & = 1 - \left[\left(\frac{2531}{4882}\right)^2  + \left(\frac{2351}{4882}\right)^2 \right] \\
+ & = 0.499
+\end{split}
+$$
+
+## Question 8 - Nombre de divisions
+
+>_Combien y a-t-il de divisions possibles pour le noeud racine ?_
+
+Le noeud racine peut être divisé par 6 variables catégorielles : _odor_, _stalk-shape_, _stalk-root_, _stalk-color-abovering_, _stalk-color-below-ring_, _spore-print-color_. Chaque variable catégorielles génère $2^k-1$ divisions possibles avec $k$ le nombre de modalités. On a donc : 
+
+* -odor_ : 9 modalités soit $2^{9-1}-1 = 255$ divisions possibles
+* -stalk-shape_ : 2 modalités soit $2^{2-1}-1 = 1$ division possible
+* -stalk-root_ : 6 modalités soit $2^{6-1}-1 = 31$ divisions possibles
+* -stalk-color-abovering_ : 9 modalités soit $2^{9-1}-1 = 255$ divisions possibles
+* -stalk-color-below-ring_ : 9 modalités soit $2^{9-1}-1 = 255$ divisions possibles
+* -spore-print-color_ : 9 modalités soit $2^{9-1}-1 = 255$ divisions possibles
+
+Au total on a donc $255 \times 4 + 1 + 31 = 1052$ divisions possibles.
+
+# Partie 2 - TP
+
+La table contenant les données s'intitule `mushroom.csv`. Elle se trouve dans le répertoire Apprentissage Supervisé dans moodle.
+
+## Question 9 - Un premier modèle
+
+<blockquote>
+Mettre en œuvre une première analyse sous R :
+
+* en supposant les probabilités a priori proportionnelles aux effectifs et les coûts de mauvais classement égaux
+* en utilisant la validation croisée sur l'échantillon "base" (lignes identifiées par cette modalité avec la variable _echantillon_ de la table `mushroom.csv`).
+</blockquote>
+
+On commence par importer les données et par constituer les 2 échantillons _train_ et _test_. Une variable `echantillon` contenant les modalités `base` et `test` peut être utilisée.
+
+```{r data_import, eval = FALSE}
+# Importer les données (transformer les character en factor pour CHAID)
+mush <- read.csv(file = "data/muschroom.csv", stringsAsFactors = TRUE)
+
+# Enlever la colonne X
+mush <- mush[, !names(musch) == "X"]
+
+# Définir les échantillons train et test
+train <- mush[mush$echantillon == "base", !names(mush) == "echantillon"]
+test <- mush[mush$echantillon == "test", !names(mush) == "echantillon"]
+```
+
+```{r data_import2, echo = FALSE}
+# Importer les données
+mush <- read.csv(file = "../data/muschroom.csv", stringsAsFactors = TRUE)
+
+# Enlever la colonne X
+mush <- mush[, !names(mush) == "X"]
+
+# Définir les échantillons train et test
+train <- mush[mush$echantillon == "base", !names(mush) == "echantillon"]
+test <- mush[mush$echantillon == "test", !names(mush) == "echantillon"]
+```
+
+On va maintenant construire un arbre CART pour prédire la variable `classe` qui indique si le champignon est comestible ou non. La fonction utilisée est `rpart::rpart()`, elle nécessite 3 arguments : 
+
+* `formula` : une formule qui spécifie la variable cible et les variables explicatives, on utilisera `classe ~ .`
+* `data` : une _data.frame_ contenant les données
+* `control` : certains hyper-paramètres de la méthode CART.
+
+De nombreux arguments sont définis par défaut mais peuvent bien sûr être modifiés. Ces arguments sont les hyper-paramètres de la méthode CART. Ils sont définis dans la fonction `rpart::rpart.control()`.
+
+* `minsplit` : le nombre minimal d'observations dans un nœud pour considérer une division
+* `minbucket` : le nombre minimal d'observations dans un nœud enfant
+* `xval` : le nombre de blocs utilisés pour la validation croisée pendant l'élagage
+* `maxcompete` : le nombre de divisions compétitives retenues (divisions equi-reductrices)
+* `maxsurrogate` : le nombre de divisions surrogates retenues (divisions equi-divisantes)
+* `usesurrogate` : la manière avec laquelle les données manquantes sont gérées. Voir la documentation pour plus d'information.
+* `maxdepth` : la profondeur maximale de l'arbre
+
+Le type d'arbre qui sera construit, régression ou classification, dépend du type de la variable cible. Pour une variable de type _factor_ ce sera une classification avec _Gini_ comme indice d'impureté.
+
+On construit le modèle CART avec la commande suivante : 
+
+```{r cart}
+# Définir les paramètres utilisés par rpart
+cart_parameters <- rpart.control(
+  minsplit = 60, 
+  minbucket = 30,
+  xval = 5, 
+  maxcompete = 4,
+  maxsurrogate = 4,
+  usesurrogate = 2,
+  maxdepth = 30
+)
+
+# Entraînement du modèle
+cart_model <- rpart(
+  formula = classe ~ .,
+  data = train,
+  control = cart_parameters
+)
+```
+
+On peut visualiser l'arbre construit avec la fonction `rpart.plot::rpart.plot()`.
+
+```{r cart_plot}
+rpart.plot(cart_model)
+```
+
+La fonction `print()`, appliquée au modèle créé, permet aussi de voir l'arbre, sous forme moins visuelle mais avec plus de détails sur chaque nœud. On peut aussi avoir des informations supplémentaires avec la fonction `summary()`. 
+
+
+## Question 10 - La première division
+
+>_Par quelle variable et quelles modalités la racine est-elle divisée ? Comment sont définis les segments t1 et t2 ? Calculer la variation d’impureté due à cette division binaire (indicateur de Gini) dans l’échantillon de base_
+
+La racine est divisée en 2 nœuds $t1$ et $t2$ avec la variable _odor_ et la coupure construite sur la division binaire des modalités :
+
+* pour $t1$ les modalités _odor_ = {a, l, n}
+* pour $t2$ les modalités _odor_ = {c,f,m,p,s,y}
+
+Les segments $t1$ et $t2$ sont définis par les règles de décisions qui découlent de cette partition des modalités. Si _odor_ dans {a, l, n} alors segment $t1$, sinon segment $t2$.
+
+On calcule la réduction d'impureté associée à cette division. On va calculer l'indice de Gini pour le nœud $t$ et les nœuds $t1$ et $t2$.
+
+$$
+\begin{split}
+I(t) & = 1 - \sum_{r = 1}^{K}P^2(G_r | t) \\
+ & = 1 - \left[\left(\frac{3153}{6093}\right)^2  + \left(\frac{2940}{6093}\right)^2 \right] \\
+ & = 0.499
+\end{split}
+$$
+$$
+\begin{split}
+I(t_1) & = 1 - \sum_{r = 1}^{K}P^2(G_r | t) \\
+ & = 1 - \left[\left(\frac{3153}{3237}\right)^2  + \left(\frac{84}{3237}\right)^2 \right] \\
+ & = 0.051
+\end{split}
+$$
+$$
+\begin{split}
+I(t_2) & = 1 - \sum_{r = 1}^{K}P^2(G_r | t) \\
+ & = 1 - \left[\left(\frac{0}{2856}\right)^2  + \left(\frac{2856}{2856}\right)^2 \right] \\
+ & = 0
+\end{split}
+$$
+Et la réduction d'impureté est donnée par : 
+
+$$
+\begin{split}
+\Delta I(t) & = I(t) - p_1I(t_1) - p_2I(t_2) \\
+ & = 0.499 - \frac{3237}{6093} \times 0.051 - \frac{2856}{6093} \times 0 \\
+ & = 0.472
+\end{split}
+$$
+
+## Question 11 - Primary split
+
+>_Une autre division de la racine aurait peut-être pu donner une réduction d’impureté presque aussi bonne. Comment qualifie-t-on cette autre division ? Que peut nous apporter le fait de s’intéresser à cette autre division ? Donner cette autre division pour le noeud t1._
+
+Une division equi-réductrice (ou primary split) est la division associée à la seconde réduction de l'impureté la plus importante. La division $odor \in \{a, l, n\}$ est la meilleure division au sens du critère de Gini. Dans la sortie de `summary(cart_model)` on peut voir que la seconde meilleure division est donnée par $spore.print.color \in \{b, k, n, o, u, y\}$. 
+
+L'intérêt est d'avoir une alternative plus pertinente pour la construction de l'arbre (variable moins difficile à collecter par exemple).
+
+## Question 12 - Nombre de feuilles
+
+>_Quel est le nombre de segments terminaux de l’arbre optimal ?_
+
+Il y a 3 feuilles, ou nœuds terminaux, dans l'arbre. Il s'agit des nœuds qui ne sont pas divisés. 
+
+## Question 13 - Règle d'affectation
+
+>_Quel est le principe d’affectation d’un nœud terminal ?_
+
+Dans le cas d'une matrice de coût unitaire, la règle d'affectation est la suivante (pour le cas binaire) : on affecte à la classe _e_ si $P(G_e|t) > P(G_p|t)$. 
+
+Avec des probabilités a priori égales aux fréquence empiriques on a : $P(G_e|t) = \frac{n_e(t)}{n(t)}$ et $P(G_p|t) = \frac{n_p(t)}{n(t)}$. On affecte donc le nœud $t$ à la classe la plus fréquente. 
+
+## Question 14 - Matrice de confusion
+
+>_Construire la matrice de confusion et calculer le taux d’erreur sur l’échantillon test._
+
+On peut effectuer des prédictions sur les données de test pour mesurer l'erreur de généralisation et visualiser la matrice de confusion.
+
+```{r cart_pred}
+# Effectuer une prédiction sur les données test
+cart_pred <- predict(
+  object = cart_model,
+  newdata = test,
+  type = "class" # renvoyer les classes prédites et non pas les probabilités
+)
+confusion_matrix <- table(test$classe, cart_pred)
+```
+
+```{r cart_conf_mat, echo = FALSE}
+kable(confusion_matrix) %>% 
+  add_header_above(c(" " = 1, "Prédictions" = 2)) %>%
+  kable_styling(full_width = FALSE)
+```
+
+L'erreur est de `r round(sum(cart_pred != test$classe) / nrow(test), digits = 3)`.
+
+Notre erreur est très faible mais on peut remarquer qu'elle est uniquement du à des cas où on prédit que le champignon est comestible alors qu'il ne l'est pas. En pratique cette erreur est bien plus grave que se tromper dans l'autre sens. 
+
+## Question 15 - Comment prédire ? 
+
+>_Si l’on vous apporte un nouveau champignon qui présente les caractéristiques suivantes : odeur = amande, forme du pied s’élargissant, racine en forme de massue, couleur de tige au-dessus de l’anneau = cannelle, couleur de tige au-dessous de l’anneau = chamois, couleur des spores = chamois. Le classerez-vous en catégorie poison ou comestible ?_
+
+On suit tout simplement l'arbre. La première division, $odor \in \{a, l, n\}$, envoie le champignon à gauche, la seconde division, $spore.print.color \in \{b, h, k, n, o, u, w, y\}$, envoie le champignon à droite donc on prédit que le champignon est comestible. 
+
+## Question 16 - Matrice de coût
+
+>_Mettre en oeuvre une seconde analyse CART. On fait désormais varier le coût de mauvais classement selon la matrice de coût indiquée : C(comestible/poison)=1000 et C(poison/comestible)=1. En quoi cette modification est-elle pertinente ?_
+
+On souhaite ici changer la règle d'affectation pour pénaliser fortement une certaine erreur plutôt qu'une autre. On veut éviter au maximum de prédire à tort qu'un champignon est comestible.
+
+Pour cela on va spécifier la nouvelle matrice de coûts dans la fonction `rpart::rpart()`.
+
+```{r cart_cost}
+cart_model_cost <- rpart(
+  classe ~ .,
+  data = train,
+  parms = list(
+    loss = matrix(
+      c(0, 1, 1000, 0),
+      byrow = TRUE,
+      nrow = 2)
+  ),
+  control = cart_parameters
+)
+```
+
+L'arbre obtenu est représenté ici. Il est différent de celui obtenu précédemment, il est bien plus complexe. Le modèle a cherché à isoler les champignons non-comestibles.
+
+```{r cart_cost_plot}
+rpart.plot(cart_model_cost)
+```
+
+On va effectuer des prédictions sur les données de test et remplir la matrice de confusion pour voir si les coûts qu'on a ajoutés ont bien joué leur rôle. 
+
+```{r cart_cost_pred}
+# Effectuer une prédiction sur les données test
+cart_cost_pred <- predict(
+  object = cart_model_cost,
+  newdata = test,
+  type = "class" # renvoyer les classes prédites et non pas les probabilités
+)
+confusion_matrix <- table(test$classe, cart_cost_pred)
+```
+
+```{r cart_cost_conf_mat, echo = FALSE}
+kable(confusion_matrix) %>% 
+  add_header_above(c(" " = 1, "Prédictions" = 2)) %>%
+  kable_styling(full_width = FALSE)
+```
+
+L'erreur est de `r round(sum(cart_cost_pred != test$classe) / nrow(test), digits = 3)`. Elle est supérieure à l'erreur du modèle précédent mais les faux positifs ont été supprimés.
+
+## Question 17 - Règle d'affectation
+
+>_Quel est le principe d’affectation d’un noeud terminal avec cette nouvelle matrice de coût ?_
+
+On est ici dans le cas de coûts différenciés. Ce n'est donc plus la classe majoritaire qui est prédite mais celle qui minimise le coût de mauvais classement. Le coût de mauvais classement du nœud $t$ pour la classe $s$ est donné par la formule suivante. $c(s/r)$ correspond au coût d'affectation à la classe $s$ alors que la vraie classe est $r$.
+
+$$
+CM_s(t) = \sum_{r = 1}^{K}c(s/r)P(G_r | t)
+$$
+La classe prédite sera celle avec le coût d'affectation $CM_s(t)$ le plus faible. 
+
+## Question 18 - CHAID
+
+>_Tester une autre méthode de segmentation par arbre vue en cours._
+
+Slides 128 à 144 pour l'arbre CHAID
+
+On va construire un arbre CHAID. La fonction utilisée est `CHAID::chaid()`, elle nécessite les même arguments que la fonction `rpart::rpart()` : 
+
+* `formula` : une formule qui spécifie la variable cible et les variables explicatives, on utilisera `classe ~ .`
+* `data` : une _data.frame_ contenant les données
+* `control` : certains hyper-paramètres de la méthode CHAID. La fonction `CHAID::chaid_control()` est utilisée pour les définir. 
+
+```{r chaid}
+chaid_model <- chaid(
+  formula = classe ~ .,
+  data = train,
+  control = chaid_control(
+    minsplit = 60,
+    minbucket = 30
+  )
+)
+```
+
+On peut tracer l'arbre généré et ensuite prédire les valeurs des observations de test pour calculer l'erreur de généralisation. 
+
+```{r chaid_plot}
+plot(
+  chaid_model,
+  type = "simple",
+  compress = TRUE,
+  margin = 0.2,
+  branch = 0.3
+)
+```
+
+
+
+<br>
+
+<cite> -- Mathieu Marauri</cite>
