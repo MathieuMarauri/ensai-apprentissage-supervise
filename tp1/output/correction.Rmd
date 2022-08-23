@@ -258,17 +258,17 @@ ggplot(
 Le modèle des $K$ plus-proches-voisins (_K-nearest-neighbours_ en anglais) est un modèle d'apprentissage supervisé utilisable en classification et en régression. Son principe est simple. Pour prédire la classe d'une nouvelle observation, on calcule la distance qui sépare ce nouveau point de tous les points des données d'apprentissage, on sélectionne les $k$ points les plus proches puis on détermine la classe à prédire en faisant un vote à la majorité. 
 
 <div style="text-align:center">
-![](images/knn.png)
+![Modèle KNN expliqué visuellement. [source](https://www.datacamp.com/tutorial/k-nearest-neighbor-classification-scikit-learn)](images/knn.png)
 </div>
 
 _Quelques points d'attention :_
 
 * L'hyper-paramètre $k$ est bien sûr l'élément central de ce modèle. Il faut choisir sa valeur de manière réfléchie (on verra dans la suite comment procéder). 
 * La distance utilisée est aussi un point important. On choisira souvent la distance euclidienne mais il est bon de savoir qu'on peut utiliser n'importe quelle mesure de similarité selon les besoins. 
-* Enfin il faut savoir que plus il y a de prédicteurs plus les plus proches voisins seront potentiellement éloignés, c'est ce que l'on appelle le fléau de la dimension. 
+* Enfin il faut savoir que plus il y a de prédicteurs plus les plus proches voisins seront potentiellement éloignés, c'est ce que l'on appelle le fléau de la dimension. [Ce papier](https://www.researchgate.net/publication/30013021_On_the_Surprising_Behavior_of_Distance_Metric_in_High-Dimensional_Space) fournit des détails intéressants à ce sujet.
 
 <div style="text-align:center">
-![](images/curse.png)
+![Le fléau de la dimension. [Source](https://medium.com/@soumiksanku08/curse-of-dimensionality-293d0d16fe2a)](images/curse.png)
 </div>
 
 #### La règle de décision
@@ -880,10 +880,11 @@ knn_pred <- predict(
   object = knn_fit,
   newdata = test
 )
-knn_num_error <- sqrt(mean((knn_pred - test$price)^2))
+knn_num_rmse_error <- sqrt(mean((knn_pred - test$price)^2))
+knn_num_mape_error <- mean(abs((test$price[test$price != 0] - knn_pred[test$price != 0]) / test$price[test$price != 0])) * 100
 ```
 
-L'erreur est de `r round(sqrt(mean((knn_pred - test$price)^2)), digits = 3)`.
+L'erreur RMSE est de `r round(knn_num_rmse_error, digits = 0)`. L'écart absolu moyen entre la valeur prédite et la valeur réelle est de `r round(knn_num_mape_error, digits = 0)`%.
 
 #### Variables catégorielles encodées
 
@@ -971,10 +972,11 @@ knn_pred <- predict(
   object = knn_fit,
   newdata = test
 )
-knn_factor_error <- sqrt(mean((knn_pred - test$price)^2))
+knn_factor_rmse_error <- sqrt(mean((knn_pred - test$price)^2))
+knn_factor_mape_error <- mean(abs((test$price[test$price != 0] - knn_pred[test$price != 0]) / test$price[test$price != 0])) * 100
 ```
 
-L'erreur est de `r round(sqrt(mean((knn_pred - test$price)^2)), digits = 3)`.
+L'erreur RMSE est de `r round(knn_factor_rmse_error, digits = 0)`. L'écart absolu moyen entre la valeur prédite et la valeur réelle est de `r round(knn_factor_mape_error, digits = 0)`%.
 
 #### ACM
 
@@ -1057,10 +1059,11 @@ knn_pred <- predict(
 )
 
 # Calcul de l'erreur
-knn_acm_error <- sqrt(mean((knn_pred - test$price)^2))
+knn_acm_rmse_error <- sqrt(mean((knn_pred - test$price)^2))
+knn_acm_mape_error <- mean(abs((test$price[test$price != 0] - knn_pred[test$price != 0]) / test$price[test$price != 0])) * 100
 ```
 
-L'erreur obtenue est de `r round(sqrt(mean((knn_pred - test$price)^2)), digits = 3)`.
+L'erreur RMSE est de `r round(knn_acm_rmse_error, digits = 0)`. L'écart absolu moyen entre la valeur prédite et la valeur réelle est de `r round(knn_acm_mape_error, digits = 0)`%.
 
 #### Comparaison des erreurs
 
@@ -1069,7 +1072,8 @@ On a testé 3 approches pour répondre à la problématique de prédiction. On p
 ```{r results}
 data.frame(
     "Approche" = c("Données de localisation uniquement", "Transformation des variables catégorielles en variables numériques", "Utilisation d'une ACM"),
-    "Erreur" = c(knn_num_error, knn_factor_error, knn_acm_error),
+    "Erreur RMSE" = round(c(knn_num_rmse_error, knn_factor_rmse_error, knn_acm_rmse_error), digits = 0),
+    "Erreur MAPE" = paste0(round(c(knn_num_mape_error, knn_factor_mape_error, knn_acm_mape_error), digits = 0), '%'),
     check.names = FALSE
   ) %>% 
 kable(align = c('c', 'r')) %>% 
