@@ -1,0 +1,11 @@
+p > code, em > code, li > code {
+    color: #8f5903 !important;
+    font-weight: bold;
+    background-color: rgb(248, 248, 248) !important;
+}
+
+/*
+.sourceCode code {
+    font-weight: normal;
+}
+*/

@@ -1,0 +1,78 @@
+/* Center the figure caption */
+.figure-caption {
+    text-align: center;
+}
+
+/* Color of the headers */
+h6, .h6, h5, .h5, h4, .h4, h3, .h3, h2, .h2, h1, .h1{
+    color: #1b7775;
+}
+
+/* Font family */
+body {
+    font-family: 'Gibson Light';
+    font-size: 20px;
+}
+
+/* Color of the links */
+a {
+    color: #b58901;
+}
+
+/* Title block style */
+#title-block-header.quarto-title-block.default .quarto-title .title {
+    margin-bottom: 0;
+    text-align: center;
+}
+
+#title-block-header.quarto-title-block.default .quarto-title-meta {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    text-align: center;
+}
+
+/* Blockquote */
+blockquote {
+  font-size: 22.5px;
+}
+
+/* Inline code */
+code {
+    color: #23519A;
+}
+
+/* Sidebar color */
+.sidebar nav[role=doc-toc] ul>li>a.active {
+    border-left: 1px solid #51B081;
+    color: #51B081!important;
+}
+
+.sidebar nav[role=doc-toc] ul>li>ul>li>a.active {
+    border-left: 1px solid #51B081;
+    color: #51B081 !important;
+}
+
+.sidebar nav[role=doc-toc] ul>li>ul>li>ul>li>a.active {
+    border-left: 1px solid #51B081;
+    color: #51B081!important;
+}
+
+/* Source code */
+pre {
+  font-size: 15px;
+}
+code.sourceCode > span {
+    color: #23519A;
+}
+
+code span {
+    color: #23519A
+}
+
+code span.dv, code span.fl, code span.va {
+    color: #98538E;
+}
+
+code span.st {
+    color: #258849;
+}
