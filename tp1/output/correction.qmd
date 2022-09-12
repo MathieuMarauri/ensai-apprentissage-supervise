@@ -107,7 +107,7 @@ $$
 
 **Cas 1**
 
-On définie la règle de Bayes en calculant $P(Y=1|X=x_i)$ selon les valeurs de $X$.
+On définit la règle de Bayes en calculant $P(Y=1|X=x_i)$ selon les valeurs de $X$.
 
 Pour $X \leq 0$ : $P(Y=1|X=X_i)=P(U_i \leq 0,1) = 0,1$ d'où $f^*(X_i) = 0$.
 
@@ -137,7 +137,7 @@ $$
 
 **Cas 2**
 
-On définie la règle de Bayes en calculant $P(Y=1|X=x_i)$ selon les valeurs de $X$.
+On définit la règle de Bayes en calculant $P(Y=1|X=x_i)$ selon les valeurs de $X$.
 
 Pour $X \leq 0$ : $P(Y=1|X=X_i)=P(U_i \leq 0,2) = 0,2$ d'où $f^*(X_i) = 0$.
 
@@ -263,7 +263,7 @@ ggplot(
 
 ### Le modèle KNN
 
-Le modèle des $K$ plus-proches-voisins (*K-nearest-neighbours* en anglais) est un modèle d'apprentissage supervisé utilisable en classification et régression. Soient $(\textbf{x}_i, y_i)$ pour $i = 1, \dots, n$ des données d'apprentissage et $\textbf{x}$ le point à prédire. Pour effectuer la prédiction de la valeur $y$ de $\textbf{x}$, on calcule la distance qui sépare $\textbf{x}$ de chaque $\textbf{x}_i$. On sélectionne ensuite les $k$ points $(\textbf{x}_1, \dots, \textbf{x}_k)$ les plus proches de $\textbf{x}$ parmi les points $\textbf{x}_i, i = 1, \dots, n$ puis on détermine la classe à prédire en faisant un vote à la majorité sur $(y_1, \dots, y_k)$ pour la classification et en prenant la moyenne $\frac{1}{k} \sum_{j=1}^{k}y_j$ pour la regression.
+Le modèle des $K$ plus-proches-voisins (*K-nearest-neighbours* en anglais) est un modèle d'apprentissage supervisé utilisable en classification et régression. Soient $(\textbf{x}_i, y_i)$ pour $i = 1, \dots, n$ des données d'apprentissage et $\textbf{x}$ le point à prédire. Pour effectuer la prédiction de la valeur $y$ de $\textbf{x}$, on calcule la distance qui sépare $\textbf{x}$ de chaque $\textbf{x}_i$. On sélectionne ensuite les $k$ points $(\textbf{x}_1, \dots, \textbf{x}_k)$ les plus proches de $\textbf{x}$ parmi les points $\textbf{x}_i, i = 1, \dots, n$ puis on détermine la classe à prédire en faisant un vote à la majorité sur $(y_1, \dots, y_k)$ pour la classification et en prenant la moyenne $\frac{1}{k} \sum_{j=1}^{k}y_j$ pour la régression.
 
 ::: {style="text-align:center; padding: 20px 10px;"}
 ![Modèle des plus proches voisins expliqué visuellement.](images/knn_explique.png){width="70%"}
@@ -456,35 +456,41 @@ Sur cet exemple simple, il apparaît clairement qu'il n'est pas possible d'utili
 
 ### Le modèle bayésien naïf
 
+Le modèle bayésien naïf est un modèle d'apprentissage supervisé, applicable en classification, dont l'objectif est de trouver la classe $y$ maximisant $P(Y=y|X=x)$. 
+
+$$
+\underset{y \in \mathcal{Y}}{\arg\max} \ \ \widehat{P}(Y=y|X=x)
+$${#eq-naive-bayes}
+
+Autrement dit, le modèle bayésien naïf répond à la question : sachant les valeurs prises par les prédicteurs $X$, quelle est la classe de $Y$ la plus probable ?
+
 Ce modèle se base sur la formule de Bayes :
 
 $$
 P(Y=y|X=x) = \frac{P(Y=y) \times P(X=x|Y=y)}{P(X=x)}
-$$ Pour estimer $P(Y=y|X=x)$ (le but de tout modèle d'apprentissage supervisé) il faut donc estimer $P(Y=y)$, $P(X=x|Y=y)$ et $P(X=x)$. Précisément on cherche quelle classe prédire, c'est à dire le $y$ qui correspondra à la plus grande probabilité.
+$$ {#eq-bayes-formula}
 
-On cherche donc :
+Estimer $P(Y=y|X=x)$ revient donc à estimer $P(Y=y)$, $P(X=x|Y=y)$ et $P(X=x)$. 
 
-$$
-\underset{y \in \mathcal{Y}}{\arg\max} \ \ \widehat{P}(Y=y|X=x)
-$$
-
-Comme $P(X=x)$ ne dépend pas de $y$ on cherche donc :
+$P(X=x)$ ne dépendand pas de $y$ l'@eq-naive-bayes devient :
 
 $$
 \underset{y \in \mathcal{Y}}{\arg\max} \ \ \widehat{P}(Y=y) \times \widehat{P}(X=x|Y=y)
-$$
+$${#eq-naive-bayes-simple}
 
-Le calcul de $\widehat{P}(Y=y)$ se fait directement par les fréquences empiriques. $\widehat{P}(X=x|Y=y)$ se calcule en faisant l'hypothèse que tous les $X_j$, les différentes variables explicatives, sont indépendants conditionnellement à $Y$. On a donc :
+Le calcul de $\widehat{P}(Y=y)$ se fait directement par les fréquences empiriques. $\widehat{P}(X=x|Y=y)$ se calcule en faisant l'hypothèse que toutes les $X_j$, les différentes variables explicatives, sont indépendantes conditionnellement à $Y$. On obtient alors :
 
 $$
 \widehat{P}(X=x|Y=y) = \prod_{j=1}^{J}\widehat{P}(X_j=x_j|Y=y)
 $$
-
-On calcule donc :
+Cette hypothèse rend le modèle bayésien naïf posible. L'estimation de $P(X=x|Y=y)$ serait impossible sans cette hypothèse "naïve". Elle n'est cependant jamais complètement vérifiée sans que cela ne détériore les performances du modèle.
+En conclusion l'@eq-naive-bayes se résume à :
 
 $$
 \underset{y \in \mathcal{Y}}{\arg\max} \ \ \widehat{P}(Y=y) \times \prod_{j=1}^{J}\widehat{P}(X_j=x_j|Y=y)
 $$
+
+La probabilité $\widehat{P}(Y=y)$ est appelée le prior, cela correspond à l'a priori que l'on a sur la probabilité d'observer $Y=y$. $\widehat{P}(Y=y|X=x)$ est la probabilité posterior, elle correspond à la mise à jour effectuée sur la prior après avoir observé des données.
 
 ### La règle de décision
 
@@ -529,7 +535,7 @@ Le taux d'erreur est de `r 1 - sum(naive_bayes_pred$class == test$Y) / n_test`.
 
 Le modèle bayésien naïf a été lancé avec ses paramètres par défaut. 3 hyper-paramètres peuvent être modifiés :
 
--   l'utilisation ou non d'un noyau pour estimer les densités des variables numériques, `usekernel`
+-   l'utilisation ou non d'un noyau pour estimer les densités $\widehat{P}(X_j=x_j|Y=y)$ pour $j=1, \dots, J$, `usekernel`. [Ce blog](https://mathisonian.github.io/kde/) fournit une explication visuelle de l'estimation par noyau.
 -   la largeur de bande utilisée par le noyau (ou plus précisément un facteur multiplicatif qui sera appliqué à une largeur de bande pré-définie), `adjust`
 -   la correction de Laplace à appliquer pour les variables catégorielles, `fL`.
 
