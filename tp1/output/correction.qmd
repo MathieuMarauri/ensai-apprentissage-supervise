@@ -19,7 +19,7 @@ library("knitr")
 opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, cache = TRUE, fig.align = 'center', dpi = 300, out.width = '65%')
 ```
 
-Les différentes librairies qui seront utilisés pour ce TP sont listées ici. Le code pour générer ce document ainsi que le code R qui a servi de base peuvent être trouvés [ici](https://github.com/MathieuMarauri/ensai-apprentissage-supervise/blob/master/tp1/output/correction.Rmd) et [là](https://github.com/MathieuMarauri/ensai-apprentissage-supervise/blob/master/tp1/src/TP1.R).
+Les différentes librairies qui seront utilisés pour ce TP sont listées ici.
 
 ```{r librairies}
 library("caret") # ensemble de meta-fonctions nécessaires au processus d'apprentissage supervisé
@@ -179,7 +179,7 @@ Le risque de Bayes donne une idée de la complexité du problème. Plus l'erreur
 
 > *Simuler les données du cas 2 et créer en plus un échantillon test de taille 200 (avec le même modèle).*
 
-On va générer un vecteur de $X$ et un vecteur de $Y$ de longueur 1000. On fixe une graine pour que nos résultats soient reproductibles.
+On va générer un vecteur de $X$ et un vecteur de $Y$ de longueur 1000. On fixe une graîne pour que nos résultats soient reproductibles.
 
 ```{r simul_data}
 # Nombre d'éléments dans l'échantillon
@@ -265,8 +265,10 @@ ggplot(
 
 Le modèle des $K$ plus-proches-voisins (*K-nearest-neighbours* en anglais) est un modèle d'apprentissage supervisé utilisable en classification et régression. Soient $(\textbf{x}_i, y_i)$ pour $i = 1, \dots, n$ des données d'apprentissage et $\textbf{x}$ le point à prédire. Pour effectuer la prédiction de la valeur $y$ de $\textbf{x}$, on calcule la distance qui sépare $\textbf{x}$ de chaque $\textbf{x}_i$. On sélectionne ensuite les $k$ points $(\textbf{x}_1, \dots, \textbf{x}_k)$ les plus proches de $\textbf{x}$ parmi les points $\textbf{x}_i, i = 1, \dots, n$ puis on détermine la classe à prédire en faisant un vote à la majorité sur $(y_1, \dots, y_k)$ pour la classification et en prenant la moyenne $\frac{1}{k} \sum_{j=1}^{k}y_j$ pour la régression.
 
-::: {style="text-align:center; padding: 20px 10px;"}
-![Modèle des plus proches voisins expliqué visuellement.](images/knn_explique.png){width="70%"}
+::: {#fig-knn style="text-align:center; padding: 20px 10px;"}
+![](images/knn_explique.png){width="70%"}
+
+Modèle des plus proches voisins expliqué visuellement. Image de l'auteur.
 :::
 
 *Quelques points d'attention :*
@@ -275,8 +277,10 @@ Le modèle des $K$ plus-proches-voisins (*K-nearest-neighbours* en anglais) est 
 -   La distance utilisée est aussi un point important. On choisira souvent la distance euclidienne mais il est bon de savoir qu'on peut utiliser n'importe quelle mesure de similarité selon les besoins.
 -   Enfin il faut savoir que plus il y a de prédicteurs plus les plus proches voisins seront potentiellement éloignés, c'est ce que l'on appelle le fléau de la dimension. [Ce papier](https://www.researchgate.net/publication/30013021_On_the_Surprising_Behavior_of_Distance_Metric_in_High-Dimensional_Space) fournit des détails intéressants à ce sujet.
 
-::: {style="text-align: center; padding: 20px 10px;"}
-![Le fléau de la dimension. Plus le nombre de dimensions augmente, plus le nombre de points dans la sphére unité va diminuer. Les points s'éloignent les uns des autres avec l'augmentation du nombre de dimensions.](images/curse-dimensionality.png){width="70%"}
+::: {#fig-cursedim style="text-align: center; padding: 20px 10px;"}
+![](images/curse-dimensionality.png){width="70%"}
+
+Le fléau de la dimension. Plus le nombre de dimensions augmente, plus le nombre de points dans la sphére unité va diminuer. Les points s'éloignent les uns des autres avec l'augmentation du nombre de dimensions. Image de l'auteur.
 :::
 
 ### La règle de décision
@@ -285,7 +289,7 @@ Dans le cas d'une classification, la règle de décision associée aux $k$ plus-
 
 ### Un premier modèle
 
-On commence par lancer un modèle de k plus-proches-voisins avec un choix arbitraire pour $k$, 10 par exemple. UNe graîne est fixée pour des questions de reproductibilité. On utilise la fonction `class::knn()` qui prend 4 paramètres en entrée :
+On commence par lancer un modèle de k plus-proches-voisins avec un choix arbitraire pour $k$, 10 par exemple. Une graîne est fixée pour des questions de reproductibilité. On utilise la fonction `class::knn()` qui prend 4 paramètres en entrée :
 
 -   `train` : les prédicteurs des données d'apprentissage,
 -   `test` : les prédicteurs des données de tests sur lesquelles se feront les prédictions,
@@ -331,6 +335,12 @@ La fonction `e1071::tune.knn()` est utilisée pour réaliser cette optimisation 
 -   `k` : un vecteur de valeurs de $k$ à tester
 -   `tunecontrol` : la méthode d'échantillonnage, sous la forme d'une fonction. `tune.control(sampling = "cross")` définit la validation croisée. Dans ce cas il faut spécifier l'argument `cross = 5` pour faire une validation croisée 5 blocks, _5-fold cv_ en anglais. D'autres méthodes d'échantillonnage sont possibles.
 
+::: {#fig-crossval style="text-align: center; padding: 20px 10px;"}
+![](images/crossval.png){width="70%"}
+
+Illusatration de la validation croisée 5 blocs. L'échantillon initial est divisé en 5 blocs, chaque bloc sera utilisé une fois en tant qu'échantillon de validation, les 4 autres constitueront l'échantillon d'apprentissage. L'erreur finale sera la moyenne des erreurs mesurées sur chaque bloc. Image de l'auteur.
+:::
+
 Cette fonction retourne une liste avec les résultats du processus de choix de $k$.
 
 ```{r knn_tune}
@@ -366,7 +376,7 @@ Le meilleur $k$ est obtenu avec la commande `knn_cross_results$best.parameters$k
 
 *Remarque* 
 
-La valeur optimale de $k$ peut varier à chaque fois que la commande est lancée. UN contournement à ce problème est proposé dans l'exercice suivant.
+La valeur optimale de $k$ peut varier à chaque fois que la commande est lancée. Un contournement à ce problème est proposé dans l'exercice suivant.
 
 La valeur sélectionnée de $k$ est utilisée pour réaliser des prédictions sur les données de tests. Il est ainsi possible de comparer les résultats avec le modèle précédent, $k=10$. Le taux d'erreur est calculé comme précédemment.
 
@@ -380,7 +390,7 @@ knn_pred <- knn(
 )
 ```
 
-L'erreur est de `r 1 - sum(knn_pred == test$Y) / n_test`.
+L'erreur est de `r round(1 - sum(knn_pred == test$Y) / n_test * 100, digits=1)`%.
 
 ### Analyse de l'erreur
 
@@ -406,7 +416,7 @@ knn_pred2 <- knn(
 )
 ```
 
-L'erreur est maintenant de `r 1 - sum(knn_pred2 == test2$Y) / n_test2`. Elle est bien supérieure à l'erreur minimale théorique.
+L'erreur est maintenant de `r round(1 - sum(knn_pred2 == test2$Y) / n_test2 * 100, digits=1)`%. Elle est bien supérieure à l'erreur minimale théorique.
 
 #### Importance de l'échantillon de validation pour estimer le meilleur hyper-paramètre
 
@@ -529,7 +539,7 @@ sum(naive_bayes_pred$class == test$Y) / n_test
 1 - sum(naive_bayes_pred$class == test$Y) / n_test
 ```
 
-Le taux d'erreur est de `r 1 - sum(naive_bayes_pred$class == test$Y) / n_test`.
+Le taux d'erreur est de `r round(1 - sum(naive_bayes_pred$class == test$Y) / n_test * 100, digits = 1)`%.
 
 ### Le choix des paramètres
 
@@ -551,6 +561,19 @@ hyperparam_grid <- expand.grid(
 )
 hyperparam_grid <- rbind(hyperparam_grid, data.frame(usekernel = FALSE, fL = 0, adjust = 1))
 ```
+
+```{r nb_param_grid_table, echo=FALSE}
+#| label: tbl-hyperparam
+#| tbl-cap: Combinaisons d'hyper-paramètres à évaluer.
+
+kable(
+  x = hyperparam_grid,
+  align = 'c',
+  col.names = c("Utilisation d'un noyau", "Correction de Laplace", "Largeur de bande")
+) %>% 
+  kable_styling(full_width = FALSE)
+```
+
 
 On construit ensuite la séparation entre données d'apprentissage et de validation.
 
@@ -623,12 +646,15 @@ naive_bayes_pred <- predict(
 )
 ```
 
-Comme précédemment on calcule l'erreur de généralisation. On obtient `r 1 - sum(naive_bayes_pred$class == test$Y) / n_test`.
+Comme précédemment on calcule l'erreur de généralisation. 
 
 ```{r nb_error, eval = FALSE}
 sum(naive_bayes_pred$class == test$Y) / n_test
 1 - sum(naive_bayes_pred$class == test$Y) / n_test
 ```
+
+On obtient `r round(1 - sum(naive_bayes_pred$class == test$Y) / n_test * 100, digits = 1)`% d'erreur.
+
 
 ### Analyse de l'erreur
 
@@ -741,7 +767,7 @@ knn_pred <- knn(
 )
 ```
 
-L'erreur obtenue est `r  round(1 - sum(knn_pred == test[, "Class"]) / length(test_index), digits = 3)`.
+L'erreur obtenue est `r  round(1 - sum(knn_pred == test[, "Class"]) / length(test_index) * 100, digits = 1)`%.
 
 ## Question 4 - Naive Bayes
 
@@ -826,7 +852,7 @@ naive_bayes_pred <- predict(
 )
 ```
 
-L'erreur de généralisation est de `r round(1 - sum(naive_bayes_pred == test$"Class") / length(test_index), digits = 3)`.
+L'erreur de généralisation est de `r round(1 - sum(naive_bayes_pred == test$"Class") / length(test_index) * 100, digits = 1)`%.
 
 #### Pourquoi des *warnings* ?
 
@@ -913,7 +939,7 @@ Plusieurs solutions sont possibles :
 
 -   Effectuer une ACM pour transformer les variables catégorielles en variables continues
 -   Utiliser la distance de Hamming qui est applicable pour tout type de données (ou tout autre distance avec les mêmes propriétés)
--   Encoder les variables catégorielles en variables numériques
+-   Encoder les variables catégorielles en variables numériques. Ce choix n'est pas très intelligent ici car il n'y a aucun ordre dans les données. Nous allons tester cette approche bien qu'elle ne soit pas recommandée.
 -   Utiliser uniquement les variables continues
 
 ### Variables continues uniquement
@@ -1164,6 +1190,9 @@ data.frame(
 kable(align = c('c', 'r')) %>% 
   kable_styling(full_width = FALSE)
 ```
+
+
+L'approche avec les meilleures performances est celle utilisant une ACM pour transformer les données catégorielles en données numériques. Comme attendu l'approche consistant à recoder les données qualitatives en données quantitatives ne fonctionne pas.
 
 <br>
 
