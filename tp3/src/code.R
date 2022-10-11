@@ -30,6 +30,8 @@ library("ROCR") # courbe ROC
 library("rpart") # cart
 library("scales") # modifications des axes des graphes
 
+# Set default ggplot theme
+theme_set(theme_light(base_size = 20))
 
 
 # Préparation du modèle -----------------------------------------------------------------------
@@ -37,15 +39,13 @@ library("scales") # modifications des axes des graphes
 # Chargement de la table spambase, construction des ensembles de train et de test.
 
 # importer la table spambase dans l'environnement
-# install.packages("nutshell")
-data(spambase, package = "nutshell")
+spambase <- read.csv('tp3/data/spambase.csv', stringsAsFactors = FALSE)
 
 # transformation de la variable cible en factor
 spambase <- spambase %>%
   mutate(is_spam = as.factor(is_spam))
 
 # construction des train et test sets, le test set sera utilisé pour comparer les modèles
-set.seed(123)
 train_set <- sample(nrow(spambase), (4 * nrow(spambase)) / 5)
 test_set <- setdiff(1:nrow(spambase), train_set)
 spambase_train <- spambase[train_set, ]
@@ -136,7 +136,7 @@ cart <- rpart(
 )
 
 # prédiction des nouvelles valeurs sur le test set
-cart_pred <- predict(cart, spambase_test, type = "class")
+cart_pred <- predict(cart, newdata = spambase_test, type = "class")
 
 # matrice de confusion, taux de bonnes précisions et taux d'erreur
 table(cart_pred, spambase_test$is_spam)
@@ -325,27 +325,25 @@ ggplot(
   )
 
 
+# Random forest -------------------------------------------------------------------------------
 
+# Pour information, on teste une forêt aléatoire sur ces données
 
+# Hyper-paramètres à tester (pour test)
+grid <- expand.grid(.mtry = 5:6)
 
-
-
-
-grid <- expand.grid(.mtry = 1:20)
-
-# définir la méthode de validation, ici 10-fold cross validation
+# définir la méthode de validation, ici 5-fold cross validation
 control <- trainControl(method = "cv", number = 5)
 
 # on optimise les paramètres du modèle
 rf <- train(
   x = spambase_train %>% select(-is_spam), # prédicteurs
   y = spambase_train$is_spam, # réponse
-  method = "rf", # classifieur utilisé, ici Naive Bayes
-  trControl = control, # méthode d'échantillonage, ici 10-fold CV
+  method = "rf", # classifieur utilisé, ici forêt aléatoire
+  trControl = control, # méthode d'échantillonage, ici 5-fold CV
   tuneGrid = grid # liste des paramètres à comparer
 )
 
-plot(rf)
 
 prob_rf <- predict(rf, spambase_test, type = "prob")[, 2] %>% prediction(spambase_test$is_spam)
 

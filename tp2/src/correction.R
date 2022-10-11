@@ -144,13 +144,9 @@ sum(predtest2 != test$classe) / nrow(test)
 ?chaid
 
 # chaid decision tree
-model3 <- chaid(
+model3 <- ctree(
   formula = classe ~ .,
-  data = train,
-  control = chaid_control(
-    minsplit = 60,
-    minbucket = 30
-  )
+  data = train
 )
 
 # model results
@@ -164,5 +160,5 @@ plot(
   margin = 0.2,
   branch = 0.3
 )
-plot(model3)
+
 

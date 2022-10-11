@@ -1,0 +1,93 @@
+/* Grid layout */
+body:not(.floating):not(.docked) .page-columns.toc-left {
+    display: grid;
+    gap: 0;
+    grid-template-columns: [screen-start] 1.5em [screen-start-inset] 5fr [page-start] 35px [page-start-inset] minmax(0px, 175px) [body-start-outset] 35px [body-start] 1.5em [body-content-start] minmax(450px, calc(1000px - 3em)) [body-content-end] 1.5em [body-end] 50px [body-end-outset] minmax(0px, 200px) [page-end-inset] 50px [page-end] 5fr [screen-end-inset] 1.5em [screen-end];
+}
+
+
+/* Center the figure caption */
+.figure-caption {
+    text-align: center;
+}
+
+/* Color of the headers */
+h6, .h6, h5, .h5, h4, .h4, h3, .h3, h2, .h2, h1, .h1{
+    color: #1b7775;
+}
+
+/* Font family */
+body {
+    font-family: 'Gibson Light';
+}
+
+/* Color of the links */
+a {
+    color: #b58901;
+}
+
+/* Title block style */
+#title-block-header.quarto-title-block.default .quarto-title .title {
+    margin-bottom: 0;
+    text-align: center;
+    font-size: calc(1.725em + 1.14vw);
+}
+#title-block-header.quarto-title-block.default .quarto-title-meta {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    text-align: center;
+}
+
+
+/* Blockquote */
+blockquote {
+  /*font-size: 22.5px;*/
+  color: #676c66
+}
+
+/* Inline code */
+code {
+    color: #23519A;
+}
+
+/* Sidebar color */
+.sidebar nav[role=doc-toc] ul>li>a.active {
+    border-left: 1px solid #51B081;
+    color: #51B081!important;
+}
+
+.sidebar nav[role=doc-toc] ul>li>ul>li>a.active {
+    border-left: 1px solid #51B081;
+    color: #51B081 !important;
+}
+
+.sidebar nav[role=doc-toc] ul>li>ul>li>ul>li>a.active {
+    border-left: 1px solid #51B081;
+    color: #51B081!important;
+}
+
+/* Source code */
+/*pre {
+  font-size: 15px;
+}*/
+code.sourceCode > span {
+    color: #23519A;
+}
+
+code span {
+    color: #23519A
+}
+
+code span.dv, code span.fl, code span.va {
+    color: #98538E;
+}
+
+code span.st {
+    color: #258849;
+}
+
+/* Table */
+
+#best_k td:nth-child(1){
+    font-weight: bold;
+}

@@ -1,0 +1,880 @@
+---
+title: "Apprentissage supervisé - TP2"
+format:
+  html:
+    self-contained: true
+    code-folding: false
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    toc-float: true
+    tbl-cap-location: bottom
+    theme: cerulean
+    highlight: tango
+    css: ../../utils/styles.css
+---
+
+```{r initial_chunk, echo = FALSE, warning = FALSE, message = FALSE}
+library("knitr")
+opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, cache = TRUE, cache.path = 'cache/', fig.align = 'center', dpi = 300, out.width = '75%')
+```
+
+# Introduction
+
+Les différentes librairies qui seront utilisés pour ce TP sont listées ici. Le code complet est dipsonible à la fin de ce document.
+
+```{r librairies, appendix=TRUE}
+library('CHAID') # modèle CHAID, installer avec install.packages("CHAID", repos="http://R-Forge.R-project.org")
+library("caret") # validation croisée
+library("rpart") # modèle CART
+library("rpart.plot") # plot modèle CART 
+
+```
+
+```{r ggplot-theme, echo = FALSE}
+library("kableExtra") # table formating
+library("magrittr") # Pipe operators
+```
+
+#### Énoncé
+
+On dispose d'un ensemble de données sur les champignons (source The Audubon Society Field Guide to North American Mushrooms (1981). G. H. Linco (Pres.), New York : Alfred A. Knopf). Il est constitué de 8124 observations pour lesquelles diverses descriptions sont disponibles comme la
+surface, l'odeur, la couleur, etc, ainsi que l'information : comestible ou poison.
+
+L'objectif de ce TD/TP est de construire un modèle prédictif capable de différencier les champignons comestibles des non-comestibles, grâce aux méthodes de segmentation par arbres.
+
+Variable cible :
+Classe : comestible=e, poison=p
+
+Variables explicatives :
+
+* odor = odeur : amande (almond) = a, anis (anise) = l, creosote (creosote) = c, poisson (fishy) = y, repugnant (foul) = f, moisi (musty) = m, aucune (none) = n, âcre (pungent) = p, épicé (spicy) = s
+* stalk-shape : forme du pied s'élargissant (enlarging) = e, se resserrant (tapering) = t 
+* stalk-root : racine bulbeux (bulbous) = b, en forme de massue (club)=c, en forme de corolle
+(cup)=u, égales ou par paires (equal) = e, avec des rhizomes (rhizomorphs) =z, racines (rooted) = r
+* stalk-color-above-ring : couleur de tige au-dessus de l'anneau marron (brown)=n, chamois
+(buff)=b, cannelle (cinnamon) =c, gris (gray)=g, orange=o, rose (pink) = p, rouge (red) = e, blanc (white) = w, jaune (yellow) =y
+* stalk-color-below-ring : couleur de tige au-dessous de l'anneau marron (brown)=n, chamois
+(buff)=b, cannelle (cinnamon) =c, gris (gray)=g, orange=o, rose (pink) = p, rouge (red) = e, blanc (white) = w, jaune (yellow) =y
+* spore-print-color : couleur des spores noire (black) = k, marron (brown) = n, chamois (buff) = b, chocolat (chocolate) = h, verte (green) = r, orange=o, violette (purple) =u, blanche (white) = w, jaune (yellow) = y
+
+
+# Partie 1 - TD
+
+## Question 1 - La méthode CART
+
+>_On désire appliquer la méthode CART (discrimination par arbre) pour détecter les champignons non comestibles. Quels sont les grands principes de cette méthode ?_
+
+Un arbre de décision est une partition de l'espace. Cette partition est obtenue en divisant de façon récursive la population.
+
+Tout algorithme d'arbre de décision se compose de 3 briques : 
+
+* Un critère de division : comment décide-t-on de diviser la population ? Un noeud peut être divisé en 2, ou plus, noeuds enfants selon l'optimisation d'une certaine métrique (en général basée sur la notion d'impureté).
+* Un critère d'arrêt : quand arrêter le processus de divisions ? Des critères statistiques ou fixes peuvent être utilisés pour arrêter la croissance d'un arbre de décision. De l'élagage peut aussi être appliqué pour réduire la taille finale de l'arbre.
+* Une règle d'affectation : comment utiliser la partition finale pour effectuer une prédiction ? La valeur moyenne, ou la plus fréquente, de la variable cible est utilisée en général. Des règles différentes sont possibles.
+
+La définition spécifique de ces 3 briques est donnée en annexe (@sec-cart-blocs, en anglais). La procédure d'élagage est détaillée dans l'annnexe suivante (@sec-cart-pseudo, en anglais aussi).
+
+
+## Question 2 - Autres méthodes envisageables
+
+> _Quelles sont les autres méthodes envisageables ?_
+
+De nombreuses méthodes permettent de réaliser uns discrimination binaire : un modèle KNN, un modèle bayésien naïf (_naive bayes_) ou encore des SVM, un arbre CHAID, un arbre à inférence conditionnelle (_conditional inference tree_, package `ctree`), une analyse discriminante linéaire (_linear discriminant analysis_), des méthodes de régression (logistique, pénalisée, ...), des méthodes d'ensembles (_bagging_, _boosting_, stacking), des réseaux de neurones ...
+
+Une liste non exhaustive peut être consultée [ici](https://mlr.mlr-org.com/articles/tutorial/integrated_learners.html#classification-84-)
+
+
+## Question 3 - Apprentissage, validation, test
+
+<blockquote>
+L'échantillon total constitué de 8124 observations pourrait être divisé en trois parties :
+
+* Echantillon d'apprentissage,
+* Echantillon de validation,
+* Echantillon test.
+
+Quel serait le rôle de chacun de ces trois échantillons dans la mise en œuvre de CART?
+</blockquote>
+
+Echantillon d'apprentissage : entraîner le modèle (aka apprendre les paramètres, aka construire l'arbre, aka apprendre quelles sont les meilleurs divisions pour chaque noeud).
+Echantillon de validation : choisir les meilleurs hyper-paramètres
+Echantillon de test : mesure de l'erreur de généralisation
+
+## Question 4 - La validation croisée
+
+>_Pourrait-on se passer de créer ces trois sous-échantillons ? Si oui, quelle modification de la méthode en découlerait ?_
+
+Une autre approche pour construire l'échantillon de validation est l'utilisation la validation croisée. 
+
+## Question 5 - Critères de division
+
+>_Quel critère de division d'un noeud utilise-t-on pour construire l'arbre maximal ? Quelles sont les fonctions d'impureté les plus souvent utilisées ?_
+
+L'indice de Gini ou l'entropie de Shannon. Voir l'annexe sur le détail de la méthode CART pour plus d'informations ou le cours slides 31 à 35.
+
+## Question 6 - Probabilité a posteriori
+
+>_La variable à expliquer Y étant binaire, elle définit une partition de la population en deux groupes r avec r=1 ou r=2. Rappeler l’expression de la probabilité a posteriori d’appartenance au groupe Gr pour les éléments d’un noeud t. Comment l’estime-t-on ?_
+
+On cherche $P(G_r | t)$. D'après la formule de Bayes on a :
+
+$$
+P(G_r | t) = \frac{P(G_r) \times P(t | G_r)}{P(t)}
+$$
+
+On doit donc estimer 3 éléments pour avoir $P(G_r | t)$. $P(G_r)$ est estimée par la fréquence empirique soit $P(G_r) = \frac{n_r}{n}$. 
+
+De même $P(t | G_r)$ est estimée par la proportion des observations du groupe $G_r$ qui sont dans le nœud $t$ soit $P(t | G_r) = \frac{n_r(t)}{n_r}$.
+
+Enfin on a $P(t) = \sum_{s}P(G_s) \times P(t | G_s)$ donc :
+
+$$
+P(t) = \sum_{s}\frac{n_s}{n} \times \frac{n_s(t)}{n_s} = \sum_{s}\frac{n_s(t)}{n} = \frac{n(t)}{n}
+$$
+
+Au final on a donc : 
+
+$$
+\begin{split}
+P(G_r | t) & = \frac{\frac{n_r}{n} \times \frac{n_r(t)}{n_r}}{\frac{n(t)}{n}} \\
+ & = \frac{\frac{n_r(t)}{n}}{\frac{n(t)}{n}} \\
+ & = \frac{n_r(t)}{n(t)}
+\end{split}
+$$
+
+Il s'agit donc simplement de la proportion d'individus de la classe $r$ dans le nœud $t$.
+
+Le calcul de $P(G_r | t)$ est nécessaire pour savoir quelle est la classe avec la probabilité la plus élevée et donc quelle est la classe qui sera prédite pour ce noeud.
+
+## Question 7 - Impureté initiale
+
+>_Les probabilités a priori sont supposées proportionnelles aux effectifs dans l’échantillon. L’indice de diversité de GINI a été retenu comme fonction d’impureté. Quelle serait l’impureté initiale (segment racine t0), si par exemple parmi les 4882 champignons de l’échantillon d’apprentissage, 2531 étaient comestibles et 2351 étaient poisons?_
+
+Pour un nœud $t$ avec $K$ groupes, l'indice de Gini est calculé avec l'expression suivante : 
+
+$$
+I(t) = 1 - \sum_{r = 1}^{K}P^2(G_r | t)
+$$
+
+Comme dans la question précédente on sait que $P(G_r | t) = \frac{n_r(t)}{n(t)}$ donc pour le nœud racine on a :
+
+$$
+\begin{split}
+I(t) & = 1 - \left[\left(\frac{n_1(t)}{n(t)}\right)^2  + \left(\frac{n_2(t)}{n(t)}\right)^2 \right] \\
+ & = 1 - \left[\left(\frac{2531}{4882}\right)^2  + \left(\frac{2351}{4882}\right)^2 \right] \\
+ & = 0.499
+\end{split}
+$$
+
+## Question 8 - Nombre de divisions
+
+>_Combien y a-t-il de divisions possibles pour le noeud racine ?_
+
+Le noeud racine peut être divisé par 6 variables catégorielles : _odor_, _stalk-shape_, _stalk-root_, _stalk-color-abovering_, _stalk-color-below-ring_, _spore-print-color_. Chaque variable catégorielles génère $2^{k-1}-1$ divisions possibles avec $k$ le nombre de modalités de la variable. On a donc : 
+
+* _odor_ : 9 modalités soit $2^{9-1}-1 = 255$ divisions possibles
+* _stalk-shape_ : 2 modalités soit $2^{2-1}-1 = 1$ division possible
+* _stalk-root_ : 6 modalités soit $2^{6-1}-1 = 31$ divisions possibles
+* _stalk-color-abovering_ : 9 modalités soit $2^{9-1}-1 = 255$ divisions possibles
+* _stalk-color-below-ring_ : 9 modalités soit $2^{9-1}-1 = 255$ divisions possibles
+* _spore-print-color_ : 9 modalités soit $2^{9-1}-1 = 255$ divisions possibles
+
+Au total on a donc $255 \times 4 + 1 + 31 = 1052$ divisions possibles.
+
+# Partie 2 - TP
+
+La table contenant les données s'intitule `mushroom.csv`. Elle se trouve dans le répertoire Apprentissage Supervisé dans moodle.
+
+## Question 9 - Un premier modèle
+
+<blockquote>
+Mettre en œuvre une première analyse sous R :
+
+* en supposant les probabilités a priori proportionnelles aux effectifs et les coûts de mauvais classement égaux
+* en utilisant la validation croisée sur l'échantillon "base" (lignes identifiées par cette modalité avec la variable _echantillon_ de la table `mushroom.csv`).
+</blockquote>
+
+On commence par importer les données et par constituer les 2 échantillons _train_ et _test_. Une variable `echantillon` contenant les modalités `base` et `test` peut être utilisée.
+
+```{r data_import, eval = FALSE, appendix=TRUE}
+# Importer les données (transformer les character en factor pour CHAID)
+mush <- read.csv(file = "data/muschroom.csv", stringsAsFactors = TRUE)
+
+# Enlever la colonne X
+mush <- mush[, !names(musch) == "X"]
+
+# Définir les échantillons train et test
+train <- mush[mush$echantillon == "base", !names(mush) == "echantillon"]
+test <- mush[mush$echantillon == "test", !names(mush) == "echantillon"]
+
+```
+
+```{r data_import2, echo = FALSE, appendix=TRUE}
+# Importer les données
+mush <- read.csv(file = "../data/muschroom.csv", stringsAsFactors = TRUE)
+
+# Enlever la colonne X
+mush <- mush[, !names(mush) == "X"]
+
+# Définir les échantillons train et test
+train <- mush[mush$echantillon == "base", !names(mush) == "echantillon"]
+test <- mush[mush$echantillon == "test", !names(mush) == "echantillon"]
+
+```
+
+On va maintenant construire un arbre CART pour prédire la variable `classe` qui indique si le champignon est comestible ou non. La fonction utilisée est `rpart::rpart()`, elle nécessite 3 arguments : 
+
+* `formula` : une formule qui spécifie la variable cible et les variables explicatives, on utilisera `classe ~ .`
+* `data` : une _data.frame_ contenant les données
+* `control` : certains hyper-paramètres de la méthode CART.
+
+De nombreux arguments sont définis par défaut mais peuvent bien sûr être modifiés. Ces arguments sont les hyper-paramètres de la méthode CART telle qu'elle est implémentée dans le package `rpart`. Ils sont définis dans la fonction `rpart::rpart.control()`.
+
+* `minsplit` : le nombre minimal d'observations dans un nœud pour considérer une division
+* `minbucket` : le nombre minimal d'observations dans un nœud enfant
+* `xval` : le nombre de blocs utilisés pour la validation croisée pendant l'élagage
+* `maxcompete` : le nombre de divisions compétitives retenues (divisions equi-reductrices)
+* `maxsurrogate` : le nombre de divisions surrogates retenues (divisions equi-divisantes)
+* `usesurrogate` : la manière avec laquelle les données manquantes sont gérées. Voir la documentation pour plus d'information.
+* `maxdepth` : la profondeur maximale de l'arbre
+* `cp` : le paramètre de complexité. Il est équivalent au $\alpha$ présent dans la méthode CART et sert de critère d'arrêt. Une division qui n'améliore pas la qualité de prédiction d'un facteur `cp` ne sera pas considérée.
+
+Le type d'arbre qui sera construit, régression ou classification, dépend du type de la variable cible. Pour une variable de type _factor_ ce sera une classification avec _Gini_ comme indice d'impureté.
+
+On construit le modèle CART avec la commande suivante : 
+
+```{r cart, appendix=TRUE}
+# Définir les paramètres utilisés par rpart
+cart_parameters <- rpart.control(
+  minsplit = 60, 
+  minbucket = 30,
+  xval = 5, 
+  maxcompete = 4,
+  maxsurrogate = 4,
+  usesurrogate = 2,
+  maxdepth = 30,
+  cp = 0
+)
+
+# Entraînement du modèle
+cart_model <- rpart(
+  formula = classe ~ .,
+  data = train,
+  control = cart_parameters
+)
+
+```
+
+On peut visualiser l'arbre construit avec la fonction `rpart::rpart.plot()`.
+
+```{r cart_plot, appendix=TRUE}
+rpart.plot(cart_model)
+
+```
+
+Chaque noeud de l'arbre contient 3 informations : 
+
+* La classe prédite, ici vénéneux (p) ou comestible (e).
+* La probabilité d'être vénéneux. Il s'agit de la classe de référence choise par défaut.
+* Le pourcentage d'individus présent dans le noeud.
+
+La fonction `print()`, appliquée au modèle créé, permet aussi de voir l'arbre, sous forme moins visuelle mais avec plus de détails sur chaque nœud. On peut aussi avoir des informations supplémentaires avec la fonction `summary()`. 
+
+En spécifiant `cp = 0` on indique à la méthode `rpart()` de construire un arbre maximal. Cet hyper-paramètre doit être choisi spécifiquement pour obtenir l'arbre optimal. Bien sûr les autres hyper-paramètres (`minsplit`, `minbucket`, ...) sont aussi à optimiser.
+
+2 méthodes sont possibles pour choisir le meilleur `cp` : 
+
+* Appliquer la méthode CART pour trouver le meilleur sous-arbre. Cette approche spécifique est plus complexe et ne serait pas utilisée en pratique. Elle est présentée ici à titre indicatif.
+* Effectuer une validation croisée pour choisir la meilleure valeur. La procédure de choix d'hyper-paramètre est la même quelque soit le modèle, quelque soit l'hyper-paramètre à choisir.
+
+_Méthode CART_
+
+Le sous-arbre sélectionné sera le sous-arbre le plus petit dont l'erreur est inférieur à l'erreur minimale obtenue (corrigée de l'écart type). Pour choisir cet arbre on regarde l'objet `cart_model$cptable`. 
+
+```{r cart_cp, appendix=TRUE}
+# Sélection de l'arbre avec l'erreur la plus faible
+split_best_xerror <- which.min(cart_model$cptable[, 4])
+
+# Ajout de l'écart-type pour obtenir la borne supérieure de l'erreur à ne pas dépasser
+min_error_std <- cart_model$cptable[split_best_xerror, 4] + cart_model$cptable[split_best_xerror, 5]
+
+# Sélection de tous les arbres dont l'erreur est inféreiure au seuil calculé plus haut
+possible_trees <- cart_model$cptable[cart_model$cptable[, 4] <= min_error_std, , drop = F]
+
+# Ordonner les arbres selon leur complexité (nombre de splits)
+selected_tree <- possible_trees[order(possible_trees[, 2]),, drop = F][1, ]
+
+# Choix de l'arbre le plus simple
+cp_optim <- selected_tree[1]
+
+```
+
+La valeur obtenue est `r cp_optim`. Elle est ensuite utilisée pour élaguer l'arbre avec la fonction `prune()`.
+
+```{r cart_pruned, appendix=TRUE}
+cart_model_pruned <- prune(cart_model, cp = cp_optim)
+
+```
+
+Comme précédemment on peut visualiser l'arbre obtenu avec la fonction `rpart.plot()`
+
+```{r cart_pruned_plot, echo=FALSE, appendix=TRUE}
+rpart.plot(cart_model_pruned)
+
+```
+
+_Méthode par validation croisée_
+
+Le chois de `cp` peut simplement se faire par validation croisée. Différentes valeurs sont testées et celle donnant les meilleurs résultats est conservée.
+
+```{r cart_cv, appendix=TRUE}
+cart_model_tune <- train(
+  x = train[, !names(train) == "classe"],
+  y = train$classe,
+  method = "rpart",
+  tuneGrid = data.frame(cp = seq(0, 0.2, by = 0.0005)),
+  trControl = trainControl(method = "cv", number = 5)
+)
+
+```
+
+Le meilleur `cp` est `r cart_model_tune$bestTune`.
+
+## Question 10 - La première division
+
+>_Par quelle variable et quelles modalités la racine est-elle divisée ? Comment sont définis les segments t1 et t2 ? Calculer la variation d’impureté due à cette division binaire (indicateur de Gini) dans l’échantillon de base_
+
+La racine est divisée en 2 nœuds $t1$ et $t2$ avec la variable _odor_ et la coupure construite sur la division binaire des modalités :
+
+* pour $t1$ les modalités _odor_ = {a, l, n}
+* pour $t2$ les modalités _odor_ = {c,f,m,p,s,y}
+
+Les segments $t1$ et $t2$ sont définis par les règles de décisions qui découlent de cette partition des modalités. Si _odor_ dans {a, l, n} alors segment $t1$, sinon segment $t2$.
+
+On calcule la réduction d'impureté associée à cette division. On va calculer l'indice de Gini pour le nœud $t$ et les nœuds $t1$ et $t2$.
+
+$$
+\begin{split}
+I(t) & = 1 - \sum_{r = 1}^{K}P^2(G_r | t) \\
+ & = 1 - \left[\left(\frac{3153}{6093}\right)^2  + \left(\frac{2940}{6093}\right)^2 \right] \\
+ & = 0.499
+\end{split}
+$$
+$$
+\begin{split}
+I(t_1) & = 1 - \sum_{r = 1}^{K}P^2(G_r | t) \\
+ & = 1 - \left[\left(\frac{3153}{3237}\right)^2  + \left(\frac{84}{3237}\right)^2 \right] \\
+ & = 0.051
+\end{split}
+$$
+$$
+\begin{split}
+I(t_2) & = 1 - \sum_{r = 1}^{K}P^2(G_r | t) \\
+ & = 1 - \left[\left(\frac{0}{2856}\right)^2  + \left(\frac{2856}{2856}\right)^2 \right] \\
+ & = 0
+\end{split}
+$$
+Et la réduction d'impureté est donnée par : 
+
+$$
+\begin{split}
+\Delta I(t) & = I(t) - p_1I(t_1) - p_2I(t_2) \\
+ & = 0.499 - \frac{3237}{6093} \times 0.051 - \frac{2856}{6093} \times 0 \\
+ & = 0.472
+\end{split}
+$$
+
+## Question 11 - Primary split
+
+>_Une autre division de la racine aurait peut-être pu donner une réduction d’impureté presque aussi bonne. Comment qualifie-t-on cette autre division ? Que peut nous apporter le fait de s’intéresser à cette autre division ? Donner cette autre division pour le noeud t1._
+
+Une division equi-réductrice (ou primary split) est la division associée à la seconde réduction de l'impureté la plus importante. La division $odor \in \{a, l, n\}$ est la meilleure division au sens du critère de Gini. Dans la sortie de `summary(cart_model)` on peut voir que la seconde meilleure division est donnée par $spore.print.color \in \{b, k, n, o, u, y\}$. 
+
+L'intérêt est d'avoir une alternative plus pertinente pour la construction de l'arbre (variable moins difficile à collecter par exemple).
+
+## Question 12 - Nombre de feuilles
+
+>_Quel est le nombre de segments terminaux de l’arbre optimal ?_
+
+Il y a 3 feuilles, ou nœuds terminaux, dans l'arbre. Il s'agit des nœuds qui ne sont pas divisés. 
+
+## Question 13 - Règle d'affectation
+
+>_Quel est le principe d’affectation d’un nœud terminal ?_
+
+Dans le cas d'une matrice de coût unitaire, la règle d'affectation est la suivante (pour le cas binaire) : on affecte à la classe _e_ si $P(G_e|t) > P(G_p|t)$. 
+
+Avec des probabilités a priori égales aux fréquence empiriques on a : $P(G_e|t) = \frac{n_e(t)}{n(t)}$ et $P(G_p|t) = \frac{n_p(t)}{n(t)}$. On affecte donc le nœud $t$ à la classe la plus fréquente. 
+
+## Question 14 - Matrice de confusion
+
+>_Construire la matrice de confusion et calculer le taux d’erreur sur l’échantillon test._
+
+On peut effectuer des prédictions sur les données de test pour mesurer l'erreur de généralisation et visualiser la matrice de confusion.
+
+```{r cart_pred, appendix=TRUE}
+# Effectuer une prédiction sur les données test
+cart_pred <- predict(
+  object = cart_model_pruned,
+  newdata = test,
+  type = "class" # renvoyer les classes prédites et non pas les probabilités
+)
+confusion_matrix <- table(test$classe, cart_pred)
+
+```
+
+```{r cart_conf_mat, echo = FALSE}
+kable(confusion_matrix) %>% 
+  add_header_above(c(" " = 1, "Prédictions" = 2)) %>%
+  kable_styling(full_width = FALSE)
+```
+
+L'erreur est de `r round(sum(cart_pred != test$classe) / nrow(test) * 100, digits = 2)`%.
+
+Notre erreur est très faible mais on peut remarquer qu'elle est uniquement due à des cas où on prédit que le champignon est comestible alors qu'il ne l'est pas. En pratique cette erreur est bien plus grave que de se tromper dans l'autre sens. 
+
+## Question 15 - Comment prédire ? 
+
+>_Si l’on vous apporte un nouveau champignon qui présente les caractéristiques suivantes : odeur = amande, forme du pied s’élargissant, racine en forme de massue, couleur de tige au-dessus de l’anneau = cannelle, couleur de tige au-dessous de l’anneau = chamois, couleur des spores = chamois. Le classerez-vous en catégorie poison ou comestible ?_
+
+On suit tout simplement l'arbre. La première division, $odor \in \{a, l, n\}$, envoie le champignon à gauche, la seconde division, $spore.print.color \in \{b, h, k, n, o, u, w, y\}$, envoie le champignon à droite donc on prédit que le champignon est comestible. 
+
+## Question 16 - Matrice de coût
+
+>_Mettre en oeuvre une seconde analyse CART. On fait désormais varier le coût de mauvais classement selon la matrice de coût indiquée : C(comestible/poison)=1000 et C(poison/comestible)=1. En quoi cette modification est-elle pertinente ?_
+
+On souhaite ici changer la règle d'affectation pour pénaliser fortement une certaine erreur plutôt qu'une autre. On veut éviter au maximum de prédire à tort qu'un champignon est comestible.
+
+Pour cela on va spécifier la nouvelle matrice de coûts dans la fonction `rpart::rpart()`.
+
+```{r cart_cost, appendix=TRUE}
+cart_model_cost <- rpart(
+  classe ~ .,
+  data = train,
+  parms = list(
+    loss = matrix(
+      c(0, 1, 1000, 0),
+      byrow = TRUE,
+      nrow = 2)
+  ),
+  control = cart_parameters
+)
+
+```
+
+L'arbre obtenu est représenté ici. Il est différent de celui obtenu précédemment, il est bien plus complexe. Le modèle a cherché à isoler les champignons non-comestibles.
+
+```{r cart_cost_plot, appendix=TRUE}
+rpart.plot(cart_model_cost)
+
+```
+
+On va effectuer des prédictions sur les données de test et remplir la matrice de confusion pour voir si les coûts qu'on a ajoutés ont bien joué leur rôle. 
+
+```{r cart_cost_pred, appendix=TRUE}
+# Effectuer une prédiction sur les données test
+cart_cost_pred <- predict(
+  object = cart_model_cost,
+  newdata = test,
+  type = "class" # renvoyer les classes prédites et non pas les probabilités
+)
+confusion_matrix <- table(test$classe, cart_cost_pred)
+
+```
+
+```{r cart_cost_conf_mat, echo = FALSE}
+kable(confusion_matrix) %>% 
+  add_header_above(c(" " = 1, "Prédictions" = 2)) %>%
+  kable_styling(full_width = FALSE)
+```
+
+L'erreur est de `r round(sum(cart_cost_pred != test$classe) / nrow(test) * 100, digits = 2)`%. Elle est supérieure à l'erreur du modèle précédent mais les faux positifs ont été supprimés.
+
+Comme précédemment il faudrait optimiser la valeur de `cp`.
+
+## Question 17 - Règle d'affectation
+
+>_Quel est le principe d’affectation d’un noeud terminal avec cette nouvelle matrice de coût ?_
+
+On est ici dans le cas de coûts différenciés. Ce n'est donc plus la classe majoritaire qui est prédite mais celle qui minimise le coût de mauvais classement. Le coût de mauvais classement du nœud $t$ pour la classe $s$ est donné par la formule suivante. $c(s/r)$ correspond au coût d'affectation à la classe $s$ alors que la vraie classe est $r$.
+
+$$
+CM_s(t) = \sum_{r = 1}^{K}c(s/r)P(G_r | t)
+$$
+La classe prédite sera celle avec le coût d'affectation $CM_s(t)$ le plus faible. Cette définition est donnée dans le cours. L'implémentation de la méthode CART dans `rapart` propose de changer les propabilités à priori d'appartenir à une classe si les coûts sont différenciés. C'est ce changement qui entraîne une construction de l'arbre différente.
+
+## Question 18 - CHAID
+
+>_Tester une autre méthode de segmentation par arbre vue en cours._
+
+Slides 128 à 144 pour l'arbre CHAID
+
+On va construire un arbre CHAID. La fonction utilisée est `CHAID::chaid()`, elle nécessite les même arguments que la fonction `rpart::rpart()` : 
+
+* `formula` : une formule qui spécifie la variable cible et les variables explicatives, on utilisera `classe ~ .`
+* `data` : une _data.frame_ contenant les données
+* `control` : certains hyper-paramètres de la méthode CHAID. La fonction `CHAID::chaid_control()` est utilisée pour les définir. 
+
+```{r chaid, appendix=TRUE}
+chaid_model <- chaid(
+  formula = classe ~ .,
+  data = train,
+  control = chaid_control(
+    minsplit = 60,
+    minbucket = 30
+  )
+)
+
+```
+
+On peut tracer l'arbre généré et ensuite prédire les valeurs des observations de test pour calculer l'erreur de généralisation. 
+
+```{r chaid_plot, fig.width=13, appendix=TRUE}
+plot(
+  chaid_model,
+  type = "simple",
+  compress = TRUE,
+  margin = 0.2,
+  branch = 0.3
+)
+```
+
+# Code complet
+
+```{r show_code, ref.label=all_labels(appendix == TRUE), echo=TRUE, eval=FALSE}
+ 
+```
+
+# Annexe : CART {#sec-cart}
+
+## Notations
+
+-   $Y$ is the target variable (or dependant variable)
+-   $y_i, i = 1, \dots, n$ is the value observed for the i-th element of
+    a vector of length $n$
+-   $\mathcal{Y}$ is the set of possible values for $Y$ ($\{0, 1\}$ or
+    $\mathbb{R}$ for instance)
+-   $X^j, j = 1, \dots, p$ are $p$ predictors (or independent variables
+    or covariates)
+-   $x^j_i, i = 1, \dots, n, j = 1, \dots, p$ is the value taken by the
+    i-th element on the j-th predictor
+-   $\textbf{x}$ is the matrix of covariates of dimensions $n \times p$
+-   $\textbf{x}^{\textbf{j}} = \left(x^j_1, \dots, x^j_n\right)^T$ is a
+    vector of length $n$ containing the observed values of $X^j$ for
+    $j = 1, \dots, p$
+-   $\textbf{x}_{\textbf{i}} = \left(x^1_j, \dots, x^p_i\right)$ is a
+    vector of length $p$ containing the observed values of all
+    $X^j, j = 1, \dots, p$ for the i-th element.
+-   $\mathcal{X}^j$ denotes the set of possible values of $X^j$ for
+    $j = 1, \dots, p$
+-   $N_R$ is the root node, it contains the $n$ elements of the initial
+    population.
+-   An intermediate node is denoted by $N$, it has $k<n$ elements.
+
+The objective is to predict the $y$ value of a new element
+$x = \left(x^1, \dots, x^p\right)$.
+
+## Briques élémentaires {#sec-cart-blocs}
+
+### The division criteria
+
+A division is defined by the variable the threshold used to split a
+node. The best split is obtained by comparing the impurity reduction it
+creates. 2 things must be defined: the division and the way to compare
+them, namely the impurity measure.
+
+#### The division
+
+The divisions are univariate and produce 2 child nodes $N_L$ and $N_R$
+(for left and right node respectively). A predictor $X^j$ and a
+threshold $t \in \mathbb{R}$ if $X^j$ is numerical or 2 sets of values
+if $X^j$ is categorical are necessary to define a division. Ordinal
+predictors are treated like numerical ones.
+
+##### Numerical variable
+
+If $X^j$ is numerical then the division has the form
+$X^j \leq t, t \in \mathbb{R}$. If $\textbf{x}^j$ (the values of $X^j$
+observed on the training set) has $q$ distinct values
+$\left\{x_1, \dots, x_q\right\}$ then $q-1$ divisions are possible
+$\left\{X^j \leq x_1, \dots, X^j \leq x_{q-1}\right\}$.
+
+##### Categorical variable
+
+If $X^j$ is categorical then $X^j$ takes its value in
+$\mathcal{X}^j = \left\{m_1, \dots,m_k\right\}$ for $k \in \mathbb{N}$.
+The division has the form $X^j \in \mathcal{A}$ with
+$\mathcal{A} \subset \mathcal{X}^j$. The number of possible divisions
+$n_d$ is $2^{k-1}-1$.
+
+The total number of possible combinations for a categorical variable is
+the different ways to choose $l \in \left[1;k\right[$ elements among the
+$k$ elements possible. By symmetry only half of those choices are
+considered.
+
+$$
+\begin{align*}
+n_d &= \frac{1}{2}\sum^{k-1}_{l=1}{k\choose l}\\
+&= \frac{1}{2}\left(\sum^{k}_{l=0}{k\choose l}1^l\times 1^{k-l} - {k\choose 0} - {k\choose k}\right)\\
+&= \frac{1}{2}\left(\left(1+1\right)^k-1-1\right)\\
+&= 2^{k-1}-1
+\end{align*}
+$$
+
+#### The impurity measure
+
+The impurity reduction is the metric that is used to select the best
+division. Impurity indexes quantify the variability inside a node. For
+continuous target variables it is the variance. For categorical target
+variable it can be the Gini index or the Shannon entropy.
+
+Before giving the mathematical expressions of these impurity indexes,
+here are some notations. For a node $N$ and categories
+$\left\{m_1, \dots,m_k\right\}$ of a given predictor $X^j$
+
+-   $n_N$ is the number of elements inside the node
+-   $n_{m_i}$ is the total number of elements verifying $X^j = m_i$
+-   $n_{m_i|N}$ is the total number of elements that are in the node $N$
+    that verify $X^j = m_i$
+-   $P\left(X^j = m_i|N\right)$ is the probability of having $X^j = m_i$
+    when being in the node $N$, it is abbreviated as $p_{i|N}$
+-   $p_L$ and $p_R$ are the probability of an element to be send to the
+    left node and the right node respectively. Usually we have the
+    following estimation: $p_L = \frac{n_{N_L}}{n_N}$ and
+    $p_R = \frac{n_{N_R}}{n_N}$.
+-   $s^2\left(N\right)$ is the empirical variance of $Y$ for elements in
+    the node $N$.
+-   $\overline{y_N}$ is the empirical mean of $Y$ for cases in the node
+    $N$.
+
+If $I(N)$ denotes the impurity of the node $N$ then the impurity
+reduction associated with a division $d$ is calculated as follows:
+
+$$
+\Delta I(N)_d = I\left(N\right) - p_LI\left(N_L\right) - p_RI\left(N_R\right)
+$$
+
+**Numeric variable**
+
+The impurity of a node is calculated with the empirical variance
+$I\left(N\right) = s^2\left(N\right)$, the reduction of impurity is
+given by the following expression.
+
+$$
+\Delta I\left(N\right)_d = s^2\left(N\right) - p_Ls^2\left(N_L\right) - p_Rs^2\left(N_R\right)
+$$
+
+Using the decomposition of the variance into intra-variance and
+inter-variance it appears that the impurity reduction is the
+inter-variance. $s^2\left(N\right)$ can be written as : $$
+\begin{align*}
+s^2\left(N\right) &= p_L \times s^2\left(N_L\right) + p_R \times s^2\left(N_R\right) & \textit{Intra-variance}\\
+&+ p_L \times \left(\overline{y_{N_L}} - \overline{y_N}\right)^2 + p_R \times \left(\overline{y_{N_R}} - \overline{y_N}\right)^2 & \textit{Inter-variance}
+\end{align*}
+$$ So $\Delta I\left(N\right)_d$ becomes
+$p_L \times \left(\overline{y_{N_L}} - \overline{y_N}\right)^2 + p_R \times \left(\overline{y_{N_R}} - \overline{y_N}\right)^2$.
+
+**The Gini index**
+
+For a given node $N$ the Gini index is defined by
+
+$$
+I\left(N\right) = 1 - \sum^k_{i=1}p^2_{i|N}
+$$
+
+**The Shannon entropy**
+
+For a given node $N$ the Shannon entropy is defined by
+
+$$
+I\left(N\right) = - \sum^k_{i=1}p_{i|N}\log_2\left(p_{i|N}\right)
+$$
+
+As stated on
+[Wikipedia](https://en.wikipedia.org/wiki/Entropy_(information_theory))
+*Base 2 gives the unit of bits (or "shannons"), while base e gives the
+"natural units" nat, and base 10 gives a unit called "dits", "bans", or
+"hartleys".*
+
+*The Twoing criterion*
+
+The reduction of impurity is computed as follows
+
+$$
+\Delta I\left(N\right)_d = p_L \times p_R \times \left[\sum^{k}_{i=1}\mid p_{i|N_L}-p_{i|N_R} \mid \right]^2
+$$
+
+### Stopping rule
+
+In the CART algorithm, decision trees are grown to a maximal size then
+they are pruned. Nevertheless stopping rules are still used in the
+construction of the maximal tree.
+
+-   The minimal number of elements in a leaf node: ff a division
+    produces a node with less than a fix number of elements in it, then
+    this division is impossible.
+-   The minimal number in a node to attempt a division: if a node has
+    less than a fix number lements then it is considered a leaf node.
+-   If a node is pure then of course no division should be performed.
+-   The maximum depth of a leaf node: no leaf node should be mor than a
+    fix number of division away from the root node.
+
+### The affectation rule
+
+In order to make prediction using the partition induced by the tree, the
+leaf node are affected a value.
+
+If $Y$ is numeric, the affectation rule for a leaf node $N$ is the mean
+of the $y_i, i=1, \dots, n_N$ values.
+
+If $Y$ is categorical with $k$ distinct values the most frequent value
+is used, that is, the value $m_i$ verifying
+
+$$
+P\left(m_i|N\right) > P\left(m_j|N\right) \forall i,j=1, \dots, k, i \neq j
+$$
+
+
+## Pseudo-code {#sec-cart-pseudo}
+
+### Inputs
+
+-   max.depth: the maximum depth of a node in the maximal tree.
+-   minsplit: the minimum number of observations in a node to consider a
+    division.
+-   minbucket: the minimum number of observations in a leaf node.
+-   $K$ the number of folds used in the cross validation procedure
+    needed for the pruning.
+-   the impurity criterion to use, Gini, Shannon or Twoing.
+
+### Notations
+
+-   $T^N$ is the subtree (or branch) coming from $N$
+-   $T - T^N$ is the tree pruned with the subtree $T^N$, in other words
+    $N$ becomes a leaf node.
+-   $\mid T\mid$ is the number of leaf nodes of the tree $T$.
+-   $C_\alpha(T) = C^{train}(T) + \alpha \mid T\mid$ is the
+    cost-complexity of the tree $T$. $\alpha$ is the complexity
+    parameter. $C^{train}(T)$ is the cost of the tree evaluated on the
+    training set. Likewise, $C^{test}(T)$ is the cost of the tree
+    evaluated on the test set.
+-   $\left\{T_{max}, T_1, T_2, \dots, T_R\right\}$ is the sequence of
+    subtrees that will be constructed, $T_{max}$ is the maximal tree,
+    $T_R$ is the root node.
+-   $\left\{\alpha_0, \alpha_1, \alpha_2, \dots, \alpha_R\right\}$ is
+    the sequence of complexity parameter that will be constructed while
+    pruning $T_{max}$.
+
+### Pseudo-code
+
+The CART algorithm can be divided into 2 parts. First, a maximal tree is
+build then it is pruned to produce the final tree. These 2 parts are
+combined in a cross validation procedure.
+
+*Maximal tree*
+
+Starting with the root node as $N$, do the following steps
+
+1.  Define all divisions for the node $N$.
+2.  Remove the divisions that are not acceptable due to a child node
+    having less elements than *minbucket*.
+3.  For every divisions $D$ compute the impurity reduction $\Delta(N)$
+    using the selected impurity criterion..
+4.  Split the node $N$ with the division having the highest $\Delta(N)$.
+    Cases having $X_i \leq x$ (or
+    $X^j \in \left\{m_1, \dots, m_l\right\}$ for a categorical
+    predictor) go to the right node $N_R$ and the others to the left
+    node $N_L$.
+5.  Repeat steps 1 to 3 for the nodes $N = N_R$ and $N = N_L$.
+6.  Stop if $N$ has less than $minsplit$ cases or if $I(N) = 0$, meaning
+    that the node is pure, or if $N$ is *max.depth* away from the root
+    node.
+
+*Pruning*
+
+Prune the maximal tree to build the final tree. A sequence of subtrees
+is constructed using the cost-complexity tradeoff, the final tree is
+selected using a performance metric evaluated on a test set.
+
+1.  Split the population into $K$ folds,
+
+2.  Choose one fold as the test set and the remaining $K-1$ folds as the
+    training set.
+
+3.  Build the maximal tree $T_{max}$ following the steps defined earlier
+    on the training set. Note $\alpha_0 = 0$.
+
+4.  Define $T_1$, for every intermediate nodes $N$ of the maximal tree
+    $T_{max}$ compute
+    $\Delta(C) = C^{train}(N) - \left(p_R \times C^{train}(N_R) + p_L \times C^{train}(N_L)\right)$
+    and remove the subtrees $T^N$ with $\Delta(C) = 0$. Note
+    $\alpha_1 = 0$.
+
+5.  Build the sequence of trees $\left\{T_2, \dots, T_R\right\}$, with
+    $T_R$ being the root node, and the sequence of complexity parameter
+    $\left\{\alpha_2, \dots, \alpha_R\right\}$. Start with $T = T_1$ and
+    $\alpha = 0$.
+
+    1.  For every intermediate nodes $N$ of $T$ compute the
+        cost-complexity of the node $N$,
+        $C_\alpha(N) = C^{train}(N) + \alpha \times 1$ and the one of
+        its subtree $T^N$,
+        $C_\alpha(T^N) = C^{train}(T^N) + \alpha \mid T^N\mid$.
+    2.  Remove the subtree verifying $C_\alpha(N) = C_\alpha(T^N)$.
+        Increase $\alpha$ until the equality is obtained for one node
+        $\widetilde{N}$.
+    3.  Remove the subtree $T^{\widetilde{N}}$ from $T$ and define $T_i$
+        as $T-T^{\widetilde{N}}$ and $\alpha_i$ as the $\alpha$ value
+        that gives the equality.
+    4.  Repeat steps 1 through 4 with $T = T_i$ until $T_R$.
+
+6.  For each tree of the sequence
+    $\left\{T_{max}, T_1, T_2, \dots, T_R\right\}$ compute the
+    performance on the test set $C^{test}(T_i)$ and build the sequence
+    of cost
+    $\left\{C^{test}(T_{max}), C^{test}(T_1), C^{test}(T_2), \dots, C^{test}(T_R)\right\}$.
+
+7.  Repeat the steps 2 through 6 for each fold. At the end of this step
+    $K$ sequences of trees
+    $S^k_T = \left\{T^k_{max}, T^k_1, T^k_2, \dots, T^k_R\right\}$, of
+    complexity parameter
+    $S^k_{\alpha} = \left\{\alpha^k_0, \alpha^k_1, \alpha^k_2, \dots, \alpha^k_R\right\}$
+    and of cost
+    $S^k_C = \left\{C^{test}_k(T_{max}), C^{test}_k(T_1), C^{test}_k(T_2), \dots, C^{test}_k(T_R)\right\}$
+    are constructed. For a given $k$ the sequences $S^k_T$,
+    $S^k_{\alpha}$ and $S^k_C$ have the same length but the sequences of
+    different $k$ can be of different length.
+
+8.  Repeat the steps 3 through 6 replacing the training set by the
+    entire population to build the sequences
+    $S_T = \left\{T_{max}, T_1, T_2, \dots, T_R\right\}$ and
+    $S_{\alpha} = \left\{\alpha_0, \alpha_1, \alpha_2, \dots, \alpha_R\right\}$.
+
+9.  Estimate the cost of each subtree in the sequence $S_T$ using the
+    $K$ sequences build at step 7.
+
+    1.  For every $\alpha^k_i$ in the sequence $S^k_{\alpha}$ find the
+        associated $\alpha_i$ in the sequence $S_{\alpha}$. Select
+        $\alpha^k_i$ as the closest from inferior values to
+        $\sqrt{\alpha_i\alpha_{i+1}}$.
+    2.  For every tree in the sequence $S_T$ find the $K$ associated
+        costs in the sequences $S^k_C$ based on the $\alpha^k_i$ find in
+        the previous step.
+    3.  Average the $K$ costs for every trees to obtain the sequence
+        $S_C = \left\{C^{test}(T_{max}), C^{test}(T_1), C^{test}(T_2), \dots, C^{test}(T_R)\right\}$.
+
+10. Find the tree $T_{min}$ with the lowest cost in the sequence of cost
+    $S_C$ and compute the standard deviation of this cost estimation
+    $sd\left(C^{test}(T_{min})\right) = \sqrt{\frac{C^{test}(T_{min})(1-C^{test}(T_{min}))}{n^{test}}}$
+    with $n^{test}$ is the number of cases in the test set.
+
+11. Select the smallest tree $T$ that verifies
+    $C^{test}(T) < C^{test}(T_{min}) + sd\left(C^{test}(T_{min})\right)$
+    as the final tree.
+
+This is the algorithm as detailed by Breiman et al. in 1984. In the `rpart` implementation the `cp` hyper-parameter is used during the construction of the tree and a division is performed only if the cost-complexity is increased sufficiently.
+
+<br>
+
+<cite> -- Mathieu Marauri</cite>

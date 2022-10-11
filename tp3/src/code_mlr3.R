@@ -12,27 +12,7 @@ library("paradox")
 library("scales")
 
 # Set default ggplot theme
-theme_set(
-  theme_light(
-  base_size = 20
-  ) +
-  theme(
-    text = element_text(family = "Gibson", colour = "gray10"),
-    panel.border = element_blank(),
-    axis.line = element_line(colour = "gray50", size = .5),
-    axis.ticks = element_blank(),
-    strip.background = element_rect(colour = "gray50", fill = "transparent", size = .7),
-    strip.text.x = element_text(colour = "gray10"),
-    strip.text.y = element_text(colour = "gray10"),
-    legend.key.size = unit(1.5, "cm")
-  )
-)
-
-# Set default scales
-scale_colour_continuous <- function(...) ggplot2::scale_colour_viridis_c(..., option = "viridis")
-scale_colour_discrete <- function(...) ggplot2::scale_colour_viridis_d(..., option = "viridis")
-scale_fill_continuous <- function(...) ggplot2::scale_fill_viridis_c(..., option = "viridis")
-scale_fill_discrete <- function(...) ggplot2::scale_fill_viridis_d(..., option = "viridis")
+theme_set(theme_light(base_size = 20))
 
 
 # Création de la task ------------------------------------------------------------------------
